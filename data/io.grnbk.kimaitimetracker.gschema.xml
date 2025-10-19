@@ -1,0 +1,39 @@
+<schemalist>
+  <schema id="io.grnbk.kimaitimetracker" path="/io/grnbk/kimaitimetracker/">
+    <key name="timetracker-running" type="b">
+      <default>false</default>
+      <summary>Timer running state</summary>
+      <description>Whether the timetracker is currently running or paused.</description>
+    </key>
+    <key name="kimai-api-baseurl" type="s">
+      <default>''</default>
+      <summary>Kimai API base URL</summary>
+      <description>The base URL of the Kimai server API (e.g. https://kimai.example.com/api/).</description>
+    </key>
+    <key name="last-customer" type="i">
+      <default>-1</default>
+      <summary>Last customer</summary>
+      <description>The customer id of the last recorded time entry.</description>
+    </key>
+    <key name="last-project" type="i">
+      <default>-1</default>
+      <summary>Last project</summary>
+      <description>The project id of the last recorded time entry.</description>
+    </key>
+    <key name="last-activity" type="i">
+      <default>-1</default>
+      <summary>Last activity</summary>
+      <description>The activity id of the last recorded time entry.</description>
+    </key>
+    <key name="last-description" type="s">
+      <default>''</default>
+      <summary>Last entered description</summary>
+      <description>The description of the last recorded time entry.</description>
+    </key>
+    <key name="warning-persistent" type="b">
+      <default>false</default>
+      <summary>Displayed warning persistent</summary>
+      <description>Whether the displayed warning is persistent or not.</description>
+    </key>
+  </schema>
+</schemalist>
