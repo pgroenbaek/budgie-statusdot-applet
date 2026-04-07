@@ -1,5 +1,5 @@
 /*
- * This file is part of the Budgie Desktop Kimai Timetracker Applet.
+ * This file is part of the Budgie Desktop Statusdot Applet.
  *
  * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
  *
