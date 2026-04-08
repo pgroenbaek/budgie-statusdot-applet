@@ -1,7 +1,7 @@
 /*
  * This file is part of the Budgie Desktop Statusdot Applet.
  *
- * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
+ * Copyright (C) 2026 Peter Grønbæk Andersen <peter@grnbk.io>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,13 +21,13 @@ using Budgie;
 using Gtk;
 using GLib;
 
-public class KimaiTimetrackerPlugin : Budgie.Plugin, Peas.ExtensionBase {
+public class StatusDotPlugin : Budgie.Plugin, Peas.ExtensionBase {
     public Budgie.Applet get_panel_widget(string uuid) {
-        return new KimaiTimetrackerApplet(uuid);
+        return new StatusDotApplet(uuid);
     }
 }
 
-public class KimaiTimetrackerApplet : Budgie.Applet {
+public class StatusDotApplet : Budgie.Applet {
     private Gtk.EventBox event_box;
     private Gtk.Image? applet_icon;
 
@@ -36,27 +36,27 @@ public class KimaiTimetrackerApplet : Budgie.Applet {
 
     private GLib.Settings? settings;
 
-    private string? timetracker_inactive;
-    private string? timetracker_running;
+    private string? statusdot_inactive;
+    private string? statusdot_active;
 
     public string uuid { public set; public get; }
 
-    public KimaiTimetrackerApplet(string uuid) {
+    public StatusDotApplet(string uuid) {
         Object(uuid: uuid);
 
-        settings = new GLib.Settings("io.grnbk.kimaitimetracker");
+        settings = new GLib.Settings("io.grnbk.statusdot");
 
-        timetracker_inactive = "kimai-timetracker";
-        timetracker_running = "kimai-timetracker-running";
+        timetracker_inactive = "statusdot-active";
+        statusdot_active = "statusdot-active";
 
         event_box = new Gtk.EventBox();
         this.add(event_box);
         applet_icon = new Gtk.Image.from_icon_name(get_current_mode_icon(), Gtk.IconSize.MENU);
         event_box.add(applet_icon);
 
-        popover = new KimaiTimetrackerWindow(event_box, settings);
+        popover = new StatusDotWindow(event_box, settings);
 
-        settings.changed["timetracker-running"].connect(() => {
+        settings.changed["statusdot-state"].connect(() => {
             update_icon();
         });
 
@@ -77,8 +77,8 @@ public class KimaiTimetrackerApplet : Budgie.Applet {
     }
 
     private string get_current_mode_icon() {
-        bool running = settings.get_boolean("timetracker-running");
-        string state_icon = (running) ? timetracker_running : timetracker_inactive;
+        bool running = settings.get_boolean("statusdot-state");
+        string state_icon = (running) ? timetracker_active : timetracker_inactive;
         return state_icon;
     }
 
@@ -105,5 +105,5 @@ public class KimaiTimetrackerApplet : Budgie.Applet {
 [ModuleInit]
 public void peas_register_types(TypeModule module) {
     var objmodule = module as Peas.ObjectModule;
-    objmodule.register_extension_type(typeof(Budgie.Plugin), typeof(KimaiTimetrackerPlugin));
+    objmodule.register_extension_type(typeof(Budgie.Plugin), typeof(StatusDotPlugin));
 }

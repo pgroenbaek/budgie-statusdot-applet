@@ -1,7 +1,7 @@
 /*
  * This file is part of the Budgie Desktop Statusdot Applet.
  *
- * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
+ * Copyright (C) 2026 Peter Grønbæk Andersen <peter@grnbk.io>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,13 +21,13 @@ using Soup;
 using Json;
 using GLib;
 
-public class KimaiAPI : GLib.Object {
+public class StatusDotAPI : GLib.Object {
     private Soup.Session session;
     private string base_url;
     private string auth_header;
     private bool is_connection_valid = false;
 
-    public KimaiAPI(string base_url, string api_token) {
+    public StatusDotAPI(string base_url, string api_token) {
         if (base_url.has_suffix("/")) {
             this.base_url = base_url.substring(0, base_url.length - 1);
         }
@@ -44,17 +44,17 @@ public class KimaiAPI : GLib.Object {
             GLib.Uri.parse(base_url, GLib.UriFlags.NONE);
         } catch (GLib.Error e) {
             is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("KimaiAPIError"), 1, "Invalid base URL (please adjust it in settings).");
+            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
         }
 
         if (base_url.length < 8 || base_url.substring(0, 8) != "https://") {
             is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("KimaiAPIError"), 1, "Invalid base URL (please adjust it in settings).");
+            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
         }
 
         if (base_url.length < 4 || base_url.substring(base_url.length - 4, 4) != "/api") {
             is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("KimaiAPIError"), 1, "Invalid base URL (please adjust it in settings).");
+            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
         }
 
         var message = new Soup.Message("GET", base_url + "/customers");
@@ -63,7 +63,7 @@ public class KimaiAPI : GLib.Object {
 
         if (message.status_code == Soup.Status.UNAUTHORIZED) {
             is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("KimaiAPIError"), 2, "Invalid API token (please adjust it in settings).");
+            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 2, "Invalid API token (please adjust it in settings).");
         }
 
         if (message.status_code == Soup.Status.OK) {
@@ -73,7 +73,7 @@ public class KimaiAPI : GLib.Object {
 
         is_connection_valid = false;
         throw new GLib.Error(
-            GLib.Quark.from_string("KimaiAPIError"),
+            GLib.Quark.from_string("StatusDotAPIError"),
             (int) message.status_code,
             "API validation failed: %d %s".printf((int) message.status_code, message.reason_phrase)
         );
@@ -103,7 +103,7 @@ public class KimaiAPI : GLib.Object {
             {
                 loop.quit();
                 throw new GLib.Error(
-                    GLib.Quark.from_string("KimaiAPIError"),
+                    GLib.Quark.from_string("StatusDotAPIError"),
                     (int) message.status_code,
                     "HTTP request failed: %d %s".printf((int) message.status_code, message.reason_phrase)
                 );
@@ -117,6 +117,7 @@ public class KimaiAPI : GLib.Object {
         return response;
     }
 
+    /*
     private async KimaiCustomer parse_customer_object(Json.Object obj) throws GLib.Error {
         return new KimaiCustomer() {
             id = (int) obj.get_int_member("id"),
@@ -463,5 +464,5 @@ public class KimaiAPI : GLib.Object {
             warning("Failed to parse JSON from PATCH " + url + ": %s".printf(e.message));
             return null;
         }
-    }
+    }*/
 }

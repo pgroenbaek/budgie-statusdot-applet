@@ -1,7 +1,7 @@
 /*
  * This file is part of the Budgie Desktop Statusdot Applet.
  *
- * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
+ * Copyright (C) 2026 Peter Grønbæk Andersen <peter@grnbk.io>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,27 +19,7 @@
 
 using GLib;
 
-public class KimaiCustomer : GLib.Object {
-    public int id { get; set; }
-    public string name { get; set; }
-}
-
-public class KimaiProject : GLib.Object {
-    public int id { get; set; }
-    public string name { get; set; }
-    public KimaiCustomer? customer { get; set; }
-}
-
-public class KimaiActivity : GLib.Object {
-    public int id { get; set; }
-    public string name { get; set; }
-}
-
-public class KimaiTimesheet : GLib.Object {
-    public int id { get; set; }
-    public string description { get; set; }
-    public DateTime begin { get; set; }
-    public DateTime? end { get; set; }
-    public KimaiProject project { get; set; }
-    public KimaiActivity activity { get; set; }
+public class Status : GLib.Object {
+    public int status { get; set; }
+    public int expiryTtl { get; set; }
 }

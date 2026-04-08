@@ -1,7 +1,7 @@
 /*
  * This file is part of the Budgie Desktop Statusdot Applet.
  *
- * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
+ * Copyright (C) 2026 Peter Grønbæk Andersen <peter@grnbk.io>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,18 +20,18 @@
 using GLib;
 using Gtk;
 
-public class KimaiTimetrackerSettings : Gtk.Grid {
+public class StatusDotSettings : Gtk.Grid {
     private GLib.Settings settings;
 
-    public KimaiTimetrackerSettings(GLib.Settings settings) {
+    public StatusDotSettings(GLib.Settings settings) {
         Object();
 
         this.settings = settings;
 
-        var enabled_switch = new Gtk.Switch();
+        /*var enabled_switch = new Gtk.Switch();
         this.attach(new Gtk.Label("Enable Webcam White Balance Control"), 0, 0, 1, 1);
         this.attach(enabled_switch, 1, 0, 1, 1);
 
-        settings.bind("whitebalance-enabled", enabled_switch, "active", SettingsBindFlags.DEFAULT);
+        settings.bind("whitebalance-enabled", enabled_switch, "active", SettingsBindFlags.DEFAULT);*/
     }
 }

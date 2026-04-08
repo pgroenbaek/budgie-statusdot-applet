@@ -7,16 +7,16 @@ json_glib_dep = dependency('json-glib-1.0', required: true)
 soup_dep = dependency('libsoup-2.4', required: true)
 secret_dep = dependency('libsecret-1', required: true)
 
-applet_kimaitimetracker_sources = [
-  'KimaiAPI.vala',
-  'KimaiData.vala',
-  'KimaiTimerManager.vala',
-  'KimaiTimetrackerApplet.vala',
-  'KimaiTimetrackerSettings.vala',
-  'KimaiTimetrackerWindow.vala',
+applet_statusdot_sources = [
+  'StatusDotAPI.vala',
+  'StatusDotData.vala',
+  'StatusDotManager.vala',
+  'StatusDotApplet.vala',
+  'StatusDotSettings.vala',
+  'StatusDotWindow.vala',
 ]
 
-applet_kimaitimetracker_deps = [
+applet_statusdot_deps = [
   budgie_dep,
   gtk_dep,
   glib_dep,
@@ -27,12 +27,12 @@ applet_kimaitimetracker_deps = [
 ]
 
 add_project_arguments(
-  '-DGETTEXT_PACKAGE="budgie-kimai-timetracker-applet"',
+  '-DGETTEXT_PACKAGE="budgie-statusdot-applet"',
   language: 'c'
 )
 
-shared_library('kimaitimetrackerapplet',
-  applet_kimaitimetracker_sources,
-  dependencies: applet_kimaitimetracker_deps,
+shared_library('statusdotapplet',
+  applet_statusdot_sources,
+  dependencies: applet_statusdot_deps,
   install: true
 )

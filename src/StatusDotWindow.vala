@@ -1,7 +1,7 @@
 /*
  * This file is part of the Budgie Desktop Statusdot Applet.
  *
- * Copyright (C) 2025 Peter Grønbæk Andersen <peter@grnbk.io>
+ * Copyright (C) 2026 Peter Grønbæk Andersen <peter@grnbk.io>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ using Gtk;
 using Secret;
 using Budgie;
 
-public class KimaiTimetrackerWindow : Budgie.Popover {
+public class StatusDotWindow : Budgie.Popover {
     private Gtk.Label label_customer;
     private Gtk.Label label_project;
     private Gtk.Label label_activity;
@@ -48,27 +48,27 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
     private Gtk.Label warning_label;
     private Gtk.Box warning_box;
 
-    private KimaiAPI api;
-    private KimaiTimerManager timer_manager;
+    private StatusDotAPI api;
+    private StatusDotManager statusdot_manager;
 
-    private Secret.Schema api_token_schema;
+    private Secret.Schema api_key_schema;
 
     private unowned GLib.Settings? settings;
 
-    public KimaiTimetrackerWindow(Gtk.Widget? c_parent, GLib.Settings? c_settings) {
+    public StatusDotWindow(Gtk.Widget? c_parent, GLib.Settings? c_settings) {
         Object(relative_to: c_parent);
         settings = c_settings;
-        get_style_context().add_class("kimaitimetracker-popover");
+        get_style_context().add_class("statusdot-popover");
 
-        api_token_schema = new Secret.Schema(
-            "io.grnbk.kimaitimetracker",
+        api_key_schema = new Secret.Schema(
+            "io.grnbk.statusdot",
             Secret.SchemaFlags.NONE,
-            "api-token",
+            "api-key",
             Secret.SchemaAttributeType.STRING
         );
 
-        string base_url = settings?.get_string("kimai-api-baseurl") ?? "";
-        string api_token = lookup_api_token() ?? "";
+        string base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        string api_key = lookup_api_key() ?? "";
 
         var vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
         vbox.set_margin_top(6);
@@ -81,8 +81,8 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         warning_box = build_warning_box();
         vbox.pack_start(warning_box, false, false, 0);
 
-        api = new KimaiAPI(base_url, api_token);
-        timer_manager = new KimaiTimerManager(api, c_settings);
+        api = new StatusDotAPI(base_url, api_key);
+        statusdot_manager = new StatusDotManager(api, c_settings);
 
         try {
             api.validate_connection();
@@ -105,23 +105,23 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         stack.add_named(settings_view, "settings");
         vbox.add(stack);
 
-        timer_manager.connected.connect(() => {
+        statusdot_manager.connected.connect(() => {
             hide_warning();
             settings.set_boolean("warning-persistent", false);
         });
-        timer_manager.disconnected.connect(() => {
+        statusdot_manager.disconnected.connect(() => {
             show_warning("No internet connection");
             settings.set_boolean("warning-persistent", true);
         });
-        timer_manager.updated.connect(() => {
+        statusdot_manager.updated.connect(() => {
             update_buttons();
             update_labels();
         });
-        timer_manager.stopped.connect(() => {
+        statusdot_manager.stopped.connect(() => {
             update_buttons();
             label_duration.set_text("00:00:00");
         });
-        timer_manager.refresh_from_server();
+        statusdot_manager.refresh_from_server();
 
         this.show.connect(() => {
             var warning_persistent = settings.get_boolean("warning-persistent");
@@ -254,12 +254,12 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
                 var activity_id = settings.get_int("last-activity");
                 var description = settings.get_string("last-description");
 
-                timer_manager.start_timer(project_id, activity_id, description);
+                statusdot_manager.start_timer(project_id, activity_id, description);
                 update_buttons();
             }
         });
         button_stop.clicked.connect(() => {
-            timer_manager.stop_timer();
+            statusdot_manager.stop_timer();
             update_buttons();
         });
         button_new.clicked.connect(() => switch_to_form());
@@ -369,7 +369,7 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
             var activity_id = int.parse(activity_id_str);
             var description = entry_description.get_text();
 
-            timer_manager.start_timer(project_id, activity_id, description);
+            statusdot_manager.start_timer(project_id, activity_id, description);
             update_buttons();
             switch_to_main();
         });
@@ -389,8 +389,8 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         var label_apitoken_title = new Gtk.Label("API Token:");
         label_apitoken_title.set_halign(Gtk.Align.END);
 
-        string current_base_url = settings?.get_string("kimai-api-baseurl") ?? "";
-        string current_api_token = lookup_api_token() ?? "";
+        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        string current_api_key = lookup_api_key() ?? "";
 
         var entry_baseurl = new Gtk.Entry();
         entry_baseurl.set_hexpand(true);
@@ -400,7 +400,7 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         var entry_apitoken = new Gtk.Entry();
         entry_apitoken.set_hexpand(true);
         entry_apitoken.set_halign(Gtk.Align.FILL);
-        entry_apitoken.set_text(current_api_token);
+        entry_apitoken.set_text(current_api_key);
         entry_apitoken.visibility = false;
 
         grid.attach(label_baseurl_title, 0, 0, 1, 1);
@@ -419,12 +419,12 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         button_back.clicked.connect(() => switch_to_main());
         button_save.clicked.connect(() => {
             string new_base_url = entry_baseurl.get_text() ?? "";
-            string new_api_token = entry_apitoken.get_text() ?? "";
+            string new_api_key = entry_apitoken.get_text() ?? "";
 
-            settings?.set_string("kimai-api-baseurl", new_base_url);
-            store_api_token(new_api_token);
+            settings?.set_string("statusdot-api-baseurl", new_base_url);
+            store_api_key(new_api_key);
 
-            api = new KimaiAPI(new_base_url, new_api_token);
+            api = new StatusDotAPI(new_base_url, new_api_key);
 
             try {
                 api.validate_connection();
@@ -436,8 +436,8 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
                 settings.set_boolean("warning-persistent", true);
             }
 
-            timer_manager.set_api(api);
-            timer_manager.refresh_from_server();
+            statusdot_manager.set_api(api);
+            statusdot_manager.refresh_from_server();
 
             switch_to_main();
         });
@@ -475,14 +475,14 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
     }
 
     private void update_labels() {
-        label_customer.set_text(timer_manager.customer);
-        label_project.set_text(timer_manager.project);
-        label_activity.set_text(timer_manager.activity);
-        label_description.set_text(timer_manager.description);
+        label_customer.set_text(statusdot_manager.customer);
+        label_project.set_text(statusdot_manager.project);
+        label_activity.set_text(statusdot_manager.activity);
+        label_description.set_text(statusdot_manager.description);
 
-        int hours = timer_manager.elapsed_seconds / 3600;
-        int minutes = (timer_manager.elapsed_seconds % 3600) / 60;
-        int seconds = timer_manager.elapsed_seconds % 60;
+        int hours = statusdot_manager.elapsed_seconds / 3600;
+        int minutes = (statusdot_manager.elapsed_seconds % 3600) / 60;
+        int seconds = statusdot_manager.elapsed_seconds % 60;
 
         label_duration.set_text("%02d:%02d:%02d".printf(hours, minutes, seconds));
     }
@@ -512,35 +512,35 @@ public class KimaiTimetrackerWindow : Budgie.Popover {
         warning_box.hide();
     }
 
-    private string? lookup_api_token() {
+    private string? lookup_api_key() {
         try {
             return Secret.password_lookup_sync(
-                api_token_schema,
+                api_key_schema,
                 null,
-                "api-token",
-                "kimai",
+                "api-key",
+                "statusdot",
                 null
             );
         } catch (GLib.Error e) {
-            warning("Could not read API token: %s", e.message);
+            warning("Could not read API key: %s", e.message);
             return null;
         }
     }
 
-    private void store_api_token(string token) {
+    private void store_api_key(string token) {
         try {
             Secret.password_store_sync(
-                api_token_schema,
+                api_key_schema,
                 null,
-                "Kimai API token",
+                "Statusdot API token",
                 token,
                 null,
-                "api-token",
-                "kimai",
+                "api-key",
+                "statusdot",
                 null
             );
         } catch (GLib.Error e) {
-            show_warning("Could not store API token: %s".printf(e.message));
+            show_warning("Could not store API key: %s".printf(e.message));
         }
     }
 
