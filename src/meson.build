@@ -8,9 +8,9 @@ soup_dep = dependency('libsoup-2.4', required: true)
 secret_dep = dependency('libsecret-1', required: true)
 
 applet_statusdot_sources = [
-  'StatusDotAPI.vala',
-  'StatusDotData.vala',
-  'StatusDotManager.vala',
+  #'StatusDotAPI.vala',
+  #'StatusDotData.vala',
+  #'StatusDotManager.vala',
   'StatusDotApplet.vala',
   'StatusDotSettings.vala',
   'StatusDotWindow.vala',

@@ -24,32 +24,8 @@ using Secret;
 using Budgie;
 
 public class StatusDotWindow : Budgie.Popover {
-    private Gtk.Label label_customer;
-    private Gtk.Label label_project;
-    private Gtk.Label label_activity;
-    private Gtk.Label label_description;
-    private Gtk.Label label_duration;
-
-    private Gtk.Button button_start;
-    private Gtk.Button button_stop;
-    private Gtk.Button button_new;
-    private Gtk.Button button_settings;
-
-    private Gtk.ComboBoxText combobox_customer;
-    private Gtk.ComboBoxText combobox_project;
-    private Gtk.ComboBoxText combobox_activity;
-    private Gtk.Entry entry_description;
-
-    private Gtk.Stack stack;
-    private Gtk.Box main_view;
-    private Gtk.Box form_view;
-    private Gtk.Box settings_view;
-
-    private Gtk.Label warning_label;
-    private Gtk.Box warning_box;
-
-    private StatusDotAPI api;
-    private StatusDotManager statusdot_manager;
+    //private StatusDotAPI api;
+    //private StatusDotManager statusdot_manager;
 
     private Secret.Schema api_key_schema;
 
@@ -61,7 +37,7 @@ public class StatusDotWindow : Budgie.Popover {
         get_style_context().add_class("statusdot-popover");
 
         api_key_schema = new Secret.Schema(
-            "io.grnbk.statusdot",
+            "io.grnbk.statusdotapplet",
             Secret.SchemaFlags.NONE,
             "api-key",
             Secret.SchemaAttributeType.STRING
@@ -78,10 +54,7 @@ public class StatusDotWindow : Budgie.Popover {
         vbox.set_size_request(300, -1);
         add(vbox);
 
-        warning_box = build_warning_box();
-        vbox.pack_start(warning_box, false, false, 0);
-
-        api = new StatusDotAPI(base_url, api_key);
+        /*api = new StatusDotAPI(base_url, api_key);
         statusdot_manager = new StatusDotManager(api, c_settings);
 
         try {
@@ -91,10 +64,9 @@ public class StatusDotWindow : Budgie.Popover {
         } catch (GLib.Error e) {
             show_warning("%s".printf(e.message));
             settings.set_boolean("warning-persistent", true);
-        }
+        }*/
 
         main_view = build_main_view();
-        form_view = build_form_view();
         settings_view = build_settings_view();
 
         stack = new Gtk.Stack();
@@ -105,7 +77,7 @@ public class StatusDotWindow : Budgie.Popover {
         stack.add_named(settings_view, "settings");
         vbox.add(stack);
 
-        statusdot_manager.connected.connect(() => {
+        /*statusdot_manager.connected.connect(() => {
             hide_warning();
             settings.set_boolean("warning-persistent", false);
         });
@@ -121,7 +93,7 @@ public class StatusDotWindow : Budgie.Popover {
             update_buttons();
             label_duration.set_text("00:00:00");
         });
-        statusdot_manager.refresh_from_server();
+        statusdot_manager.refresh_from_server();*/
 
         this.show.connect(() => {
             var warning_persistent = settings.get_boolean("warning-persistent");
@@ -199,180 +171,6 @@ public class StatusDotWindow : Budgie.Popover {
     private Gtk.Box build_main_view() {
         var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
 
-        var label_customer_title = new Gtk.Label("Customer:");
-        label_customer_title.set_halign(Gtk.Align.END);
-        var label_project_title = new Gtk.Label("Project:");
-        label_project_title.set_halign(Gtk.Align.END);
-        var label_activity_title = new Gtk.Label("Activity:");
-        label_activity_title.set_halign(Gtk.Align.END);
-        var label_duration_title = new Gtk.Label("Duration:");
-        label_duration_title.set_halign(Gtk.Align.END);
-        var label_description_title = new Gtk.Label("Description:");
-        label_description_title.set_halign(Gtk.Align.END);
-
-        label_customer = new Gtk.Label("N/A");
-        label_customer.set_halign(Gtk.Align.START);
-        label_project = new Gtk.Label("N/A");
-        label_project.set_halign(Gtk.Align.START);
-        label_activity = new Gtk.Label("N/A");
-        label_activity.set_halign(Gtk.Align.START);
-        label_description = new Gtk.Label("N/A");
-        label_description.set_halign(Gtk.Align.START);
-        label_duration = new Gtk.Label("N/A");
-        label_duration.set_halign(Gtk.Align.START);
-
-        var grid = new Gtk.Grid();
-        grid.set_row_spacing(6);
-        grid.set_column_spacing(6);
-        grid.attach(label_customer_title, 0, 0, 1, 1);
-        grid.attach(label_customer, 1, 0, 1, 1);
-        grid.attach(label_project_title, 0, 1, 1, 1);
-        grid.attach(label_project, 1, 1, 1, 1);
-        grid.attach(label_activity_title, 0, 2, 1, 1);
-        grid.attach(label_activity, 1, 2, 1, 1);
-        grid.attach(label_description_title, 0, 3, 1, 1);
-        grid.attach(label_description, 1, 3, 1, 1);
-        grid.attach(label_duration_title, 0, 4, 1, 1);
-        grid.attach(label_duration, 1, 4, 1, 1);
-        box.add(grid);
-
-        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        button_start = create_icon_button("media-playback-start-symbolic", "Start Timer");
-        button_stop = create_icon_button("media-playback-stop-symbolic", "Stop Timer");
-        button_stop.set_sensitive(false);
-        button_new = create_icon_button("list-add-symbolic", "New Timer");
-        button_settings = create_icon_button("emblem-system-symbolic", "Settings");
-        hbox_buttons.add(button_start);
-        hbox_buttons.add(button_stop);
-        hbox_buttons.add(button_new);
-        hbox_buttons.add(button_settings);
-        box.pack_end(hbox_buttons, false, false, 0);
-
-        button_start.clicked.connect(() => {
-            if (has_last_timesheet()) {
-                var project_id = settings.get_int("last-project");
-                var activity_id = settings.get_int("last-activity");
-                var description = settings.get_string("last-description");
-
-                statusdot_manager.start_timer(project_id, activity_id, description);
-                update_buttons();
-            }
-        });
-        button_stop.clicked.connect(() => {
-            statusdot_manager.stop_timer();
-            update_buttons();
-        });
-        button_new.clicked.connect(() => switch_to_form());
-        button_settings.clicked.connect(() => switch_to_settings());
-
-        return box;
-    }
-
-    private Gtk.Box build_form_view() {
-        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
-
-        var grid = new Gtk.Grid();
-        grid.set_row_spacing(6);
-        grid.set_column_spacing(6);
-
-        var label_customer_title = new Gtk.Label("Customer:");
-        label_customer_title.set_halign(Gtk.Align.END);
-        var label_project_title = new Gtk.Label("Project:");
-        label_project_title.set_halign(Gtk.Align.END);
-        var label_activity_title = new Gtk.Label("Activity:");
-        label_activity_title.set_halign(Gtk.Align.END);
-        var label_description_title = new Gtk.Label("Description:");
-        label_description_title.set_halign(Gtk.Align.END);
-
-        combobox_customer = new Gtk.ComboBoxText();
-        combobox_customer.set_hexpand(true);
-        combobox_customer.set_halign(Gtk.Align.FILL);
-        combobox_project = new Gtk.ComboBoxText();
-        combobox_project.set_hexpand(true);
-        combobox_project.set_halign(Gtk.Align.FILL);
-        combobox_activity = new Gtk.ComboBoxText();
-        combobox_activity.set_hexpand(true);
-        combobox_activity.set_halign(Gtk.Align.FILL);
-        entry_description = new Gtk.Entry();
-        entry_description.set_hexpand(true);
-        entry_description.set_halign(Gtk.Align.FILL);
-
-        refresh_combobox_data();
-
-        combobox_customer.changed.connect(() => {
-            combobox_project.remove_all();
-            combobox_activity.remove_all();
-            var customer_id_str = combobox_customer.get_active_id();
-            if (customer_id_str != null) {
-                int customer_id = int.parse(customer_id_str);
-
-                api.get_projects.begin(customer_id, (obj, res) => {
-                    try {
-                        var projects = api.get_projects.end(res);
-                        foreach (var project in projects) {
-                            combobox_project.append(project.id.to_string(), project.name);
-                        }
-                    } catch (GLib.Error e) {
-                        show_warning("Could not fetch projects: %s".printf(e.message));
-                    }
-                });
-            }
-        });
-
-        combobox_project.changed.connect(() => {
-            combobox_activity.remove_all();
-            var project_id_str = combobox_project.get_active_id();
-            if (project_id_str != null) {
-                int project_id = int.parse(project_id_str);
-
-                api.get_activities.begin(project_id, (obj, res) => {
-                    try {
-                        var activities = api.get_activities.end(res);
-                        foreach (var activity in activities) {
-                            combobox_activity.append(activity.id.to_string(), activity.name);
-                        }
-                    } catch (GLib.Error e) {
-                        show_warning("Could not fetch activities: %s".printf(e.message));
-                    }
-                });
-            }
-        });
-
-        grid.attach(label_customer_title, 0, 0, 1, 1);
-        grid.attach(combobox_customer, 1, 0, 1, 1);
-        grid.attach(label_project_title, 0, 1, 1, 1);
-        grid.attach(combobox_project, 1, 1, 1, 1);
-        grid.attach(label_activity_title, 0, 2, 1, 1);
-        grid.attach(combobox_activity, 1, 2, 1, 1);
-        grid.attach(label_description_title, 0, 3, 1, 1);
-        grid.attach(entry_description, 1, 3, 1, 1);
-        box.add(grid);
-
-        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        var button_back = create_icon_button("go-previous-symbolic", "Back");
-        var button_start_new = create_icon_button("media-playback-start-symbolic", "Start New Timer");
-        hbox_buttons.add(button_back);
-        hbox_buttons.add(button_start_new);
-        box.pack_end(hbox_buttons, false, false, 0);
-
-        button_back.clicked.connect(() => switch_to_main());
-        button_start_new.clicked.connect(() => {
-            var customer_id_str = combobox_customer.get_active_id();
-            var project_id_str = combobox_project.get_active_id();
-            var activity_id_str = combobox_activity.get_active_id();
-
-            if (customer_id_str == null || project_id_str == null || activity_id_str == null) {
-                return;
-            }
-
-            var project_id = int.parse(project_id_str);
-            var activity_id = int.parse(activity_id_str);
-            var description = entry_description.get_text();
-
-            statusdot_manager.start_timer(project_id, activity_id, description);
-            update_buttons();
-            switch_to_main();
-        });
 
         return box;
     }
@@ -424,7 +222,7 @@ public class StatusDotWindow : Budgie.Popover {
             settings?.set_string("statusdot-api-baseurl", new_base_url);
             store_api_key(new_api_key);
 
-            api = new StatusDotAPI(new_base_url, new_api_key);
+            /*api = new StatusDotAPI(new_base_url, new_api_key);
 
             try {
                 api.validate_connection();
@@ -437,7 +235,7 @@ public class StatusDotWindow : Budgie.Popover {
             }
 
             statusdot_manager.set_api(api);
-            statusdot_manager.refresh_from_server();
+            statusdot_manager.refresh_from_server();*/
 
             switch_to_main();
         });
@@ -449,20 +247,12 @@ public class StatusDotWindow : Budgie.Popover {
         stack.set_visible_child_name("main");
     }
 
-    private void switch_to_form() {
-        stack.set_visible_child_name("form");
-    }
-
     private void switch_to_settings() {
         stack.set_visible_child_name("settings");
     }
 
     private void refresh_combobox_data() {
-        combobox_customer.remove_all();
-        combobox_project.remove_all();
-        combobox_activity.remove_all();
-
-        api.get_customers.begin((obj, res) => {
+        /*api.get_customers.begin((obj, res) => {
             try {
                 var customers = api.get_customers.end(res);
                 foreach (var customer in customers) {
@@ -471,7 +261,7 @@ public class StatusDotWindow : Budgie.Popover {
             } catch (GLib.Error e) {
                 show_warning("Could not fetch customers: %s".printf(e.message));
             }
-        });
+        });*/
     }
 
     private void update_labels() {
@@ -542,19 +332,5 @@ public class StatusDotWindow : Budgie.Popover {
         } catch (GLib.Error e) {
             show_warning("Could not store API key: %s".printf(e.message));
         }
-    }
-
-    private bool has_last_timesheet() {
-        var customer_id = settings.get_int("last-customer");
-        var project_id = settings.get_int("last-project");
-        var activity_id = settings.get_int("last-activity");
-        var description = settings.get_string("last-description");
-
-        var has_customer = customer_id != -1;
-        var has_project = project_id != -1;
-        var has_activity = activity_id != -1;
-        var has_description = description != "";
-
-        return has_customer && has_project && has_activity && has_description;
     }
 }

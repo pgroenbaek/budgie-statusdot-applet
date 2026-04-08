@@ -36,18 +36,22 @@ public class StatusDotApplet : Budgie.Applet {
 
     private GLib.Settings? settings;
 
-    private string? statusdot_inactive;
-    private string? statusdot_active;
+    private string? statusdot_invisible;
+    private string? statusdot_active_red;
+    private string? statusdot_active_orange;
+    private string? statusdot_active_green;
 
     public string uuid { public set; public get; }
 
     public StatusDotApplet(string uuid) {
         Object(uuid: uuid);
 
-        settings = new GLib.Settings("io.grnbk.statusdot");
+        settings = new GLib.Settings("io.grnbk.statusdotapplet");
 
-        timetracker_inactive = "statusdot-active";
-        statusdot_active = "statusdot-active";
+        statusdot_invisible = "statusdot-invisible";
+        statusdot_active_red = "statusdot-active-red";
+        statusdot_active_orange = "statusdot-active-orange";
+        statusdot_active_green = "statusdot-active-green";
 
         event_box = new Gtk.EventBox();
         this.add(event_box);

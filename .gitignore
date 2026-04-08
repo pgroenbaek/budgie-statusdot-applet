@@ -2,7 +2,7 @@
 .debhelper
 *.debhelper.log
 *.substvars
-/debian/budgie-kimai-timetracker-applet
+/debian/budgie-statusdot-applet
 
 # temporary files which can be created if a process still has a handle open of a deleted file
 .fuse_hidden*

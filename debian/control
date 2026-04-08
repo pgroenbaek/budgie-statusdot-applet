@@ -1,4 +1,4 @@
-Source: budgie-kimai-timetracker-applet
+Source: budgie-statusdot-applet
 Section: misc
 Priority: optional
 Maintainer: Peter Grønbæk Andersen <peter@grnbk.io>
@@ -12,11 +12,11 @@ Build-Depends: debhelper (>= 12),
                libsoup2.4-dev,
                libsecret-1-dev
 Standards-Version: 4.5.0
-Homepage: https://github.com/pgroenbaek/budgie-kimai-timetracker
-Vcs-Git: https://github.com/pgroenbaek/budgie-kimai-timetracker.git
-Vcs-Browser: https://github.com/pgroenbaek/budgie-kimai-timetracker
+Homepage: https://github.com/pgroenbaek/budgie-statusdot-applet
+Vcs-Git: https://github.com/pgroenbaek/budgie-statusdot-applet.git
+Vcs-Browser: https://github.com/pgroenbaek/budgie-statusdot-applet
 
-Package: budgie-kimai-timetracker-applet
+Package: budgie-statusdot-applet
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
@@ -26,4 +26,4 @@ Depends: ${shlibs:Depends},
          libsoup2.4-1,
          libc6,
          libsecret-1-0
-Description: A Budgie applet to track time using the Kimai Timetracker
+Description: Manage the state of the Statusdot API

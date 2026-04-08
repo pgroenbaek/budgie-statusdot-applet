@@ -19,7 +19,19 @@
 
 using GLib;
 
+public enum StatusEnum {
+    OFFLINE = 0,
+    ONLINE = 1,
+    AWAY = 2,
+    BUSY = 3,
+}
+
 public class Status : GLib.Object {
-    public int status { get; set; }
-    public int expiryTtl { get; set; }
+    public StatusEnum status { get; set; }
+    public int? expirationTtl { get; set; }
+
+    public Status(StatusEnum status, int? expirationTtl) {
+        this.status = status;
+        this.expirationTtl = expirationTtl;
+    }
 }

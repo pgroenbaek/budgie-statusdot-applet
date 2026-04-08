@@ -1,6 +1,7 @@
-build/src/libkimaitimetrackerapplet.so usr/lib/budgie-desktop/plugins/kimai-timetracker
-data/kimaitimetracker.plugin usr/lib/budgie-desktop/plugins/kimai-timetracker
-data/kimai-timetracker.svg usr/share/icons/hicolor/16x16/status/
-data/kimai-timetracker-paused.svg usr/share/icons/hicolor/16x16/status/
-data/kimai-timetracker-running.svg usr/share/icons/hicolor/16x16/status/
-data/io.grnbk.kimaitimetracker.gschema.xml usr/share/glib-2.0/schemas/
+build/src/libstatusdotapplet.so usr/lib/budgie-desktop/plugins/statusdot-applet
+data/statusdotapplet.plugin usr/lib/budgie-desktop/plugins/statusdot-applet
+data/statusdot-invisible.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-red.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-orange.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-green.svg usr/share/icons/hicolor/16x16/status/
+data/io.grnbk.statusdotapplet.gschema usr/share/glib-2.0/schemas/

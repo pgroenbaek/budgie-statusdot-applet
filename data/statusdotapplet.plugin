@@ -1,0 +1,27 @@
+[Plugin]
+Module=statusdotapplet.so
+Name=Status Dot
+Description=Manage the state of the Statusdot API
+Description[ca]=Gestiona l'estat de l'API Statusdot
+Description[de_DE]=Verwalte den Status der Statusdot-API
+Description[en_GB]=Manage the state of the Statusdot API
+Description[es]=Gestiona el estado de la API de Statusdot
+Description[fr]=Gérez l'état de l'API Statusdot
+Description[he]=נהל את מצב ה-API של Statusdot
+Description[it]=Gestisci lo stato dell'API Statusdot
+Description[ja]=Statusdot API の状態を管理
+Description[lt]=Valdykite Statusdot API būseną
+Description[ms_MY]=Uruskan status API Statusdot
+Description[nl_NL]=Beheer de status van de Statusdot API
+Description[oc]=Gestionatz l'estat de l'API Statusdot
+Description[pl]=Zarządzaj stanem API Statusdot
+Description[pt_BR]=Gerencie o estado da API Statusdot
+Description[pt_PT]=Gerir o estado da API Statusdot
+Description[sq]=Menaxhoni gjendjen e API-së Statusdot
+Description[sr_RS]=Upravljajte stanjem Statusdot API-ja
+Description[tr]=Statusdot API durumunu yönetin
+Description[zh_CN]=管理 Statusdot API 的状态
+Authors=Peter Grønbæk Andersen
+Copyright=© 2026 Peter Grønbæk Andersen
+Website=https://github.com/pgroenbaek/budgie-statusdot-applet
+Icon=statusdot-invisible
