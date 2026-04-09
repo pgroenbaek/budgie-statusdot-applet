@@ -30,6 +30,10 @@ public class StatusDotWindow : Budgie.Popover {
     private Gtk.ListStore? status_store = null;
     private Gtk.Label? status_label = null;
 
+    private Gtk.Stack? stack = null;
+    private Gtk.Box? main_view = null;
+    private Gtk.Box? settings_view = null;
+
     private ulong invisibility_id;
 
     private unowned GLib.Settings? settings;
@@ -42,55 +46,111 @@ public class StatusDotWindow : Budgie.Popover {
         var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         container.get_style_context().add_class("container");
 
-        var css = new Gtk.CssProvider();
+        /*
+        Stack with main and settings ui.
+        */
+        stack = new Gtk.Stack();
+        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
+        stack.set_transition_duration(250);
 
-        try {
-            css.load_from_data("label.bold-grey { font-weight: bold; color: #8d939e; }");
-        } catch (GLib.Error e) {
-            // ignore
-        }
+        main_view = build_main_view();
+        settings_view = build_settings_view();
 
-        Gtk.StyleContext.add_provider_for_screen(
-            Gdk.Screen.get_default(),
-            css,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
-        );
+        stack.add_named(main_view, "main");
+        stack.add_named(settings_view, "settings");
+
+        container.pack_start(stack, true, true, 0);
+        add(container);
 
         /*
-        Top box with title and enabled switch.
+        Initial state.
         */
-        var top_box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        top_box.set_hexpand(true);
+        set_status(StatusEnum.OFFLINE);
+        set_invisibility(true);
 
-        var title_label = new Gtk.Label("Status Dot");
-        title_label.get_style_context().add_class("bold-grey");
-        title_label.set_halign(Gtk.Align.START);
-        title_label.set_hexpand(true);
-        top_box.pack_start(title_label, true, true, 0);
+        /*
+        Events wiring.
+        */
+        settings.changed["statusdot-state"].connect(() => {
+            int value = settings.get_int("statusdot-state");
+            StatusEnum status = (StatusEnum) value;
+
+            set_status(status);
+        });
+
+        settings.changed["statusdot-invisible"].connect(() => {
+            bool invisible = settings.get_boolean("statusdot-invisible");
+
+            set_invisibility(invisible);
+        });
+
+        this.show_all();
+    }
+
+    private void set_status(StatusEnum status) {
+        status_combobox.set_active_id("%d".printf(status));
+    }
+
+    private StatusEnum get_status() {
+        string? id = status_combobox.get_active_id();
+
+        if (id != null) {
+            return (StatusEnum) int.parse(id);
+        }
+
+        return StatusEnum.OFFLINE;
+    }
+
+    private void set_invisibility(bool invisible) {
+        if (invisibility_switch.get_active() != invisible) {
+            invisibility_switch.set_active(invisible);
+        }
+
+        status_combobox.set_sensitive(!invisible);
+        status_label.set_sensitive(!invisible);
+    }
+
+    private Gtk.Button create_icon_button(string icon_name, string? label_text, bool hover_reveal = false) {
+        int hbox_spacing = (label_text != null) ? 6 : 0;
+
+        var hbox = new Gtk.Box(Gtk.Orientation.HORIZONTAL, hbox_spacing);
+        var image = new Gtk.Image.from_icon_name(icon_name, Gtk.IconSize.BUTTON);
+        hbox.pack_start(image, false, false, 0);
+
+        Gtk.Label? label = null;
+        if (label_text != null) {
+            label = new Gtk.Label(label_text);
+            label.set_halign(Gtk.Align.START);
+            hbox.pack_start(label, false, false, 0);
+        }
+
+        hbox.set_halign(Gtk.Align.CENTER);
+        hbox.set_valign(Gtk.Align.CENTER);
+
+        var button = new Gtk.Button();
+        button.add(hbox);
+
+        if (hover_reveal) {
+            button.get_style_context().add_class("hover-reveal-button");
+        }
+
+        return button;
+    }
+
+    private Gtk.Box build_main_view() {
+        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+
+        var grid = new Gtk.Grid();
+        grid.set_row_spacing(6);
+        grid.set_column_spacing(12);
+
+        var invisibility_label = new Gtk.Label(_("Invisible"));
+        invisibility_label.set_halign(Gtk.Align.START);
 
         invisibility_switch = new Gtk.Switch();
         invisibility_switch.set_halign(Gtk.Align.END);
-        invisibility_switch.set_margin_start(6);
-        top_box.set_margin_start(3);
-        top_box.set_margin_end(3);
-        top_box.pack_start(invisibility_switch, false, false, 0);
 
-        var top_seperator = new Gtk.Separator(Orientation.HORIZONTAL);
-        top_seperator.set_margin_top(2);
-        top_seperator.set_margin_bottom(2);
-
-        top_box.set_size_request(-1, 30);
-        container.pack_start(top_box, true, true, 0);
-        container.pack_start(top_seperator, false, false, 0);
-
-        /*
-        Top grid with device selection.
-        */
-        var top_grid = new Gtk.Grid();
-        top_grid.set_row_spacing(6);
-        top_grid.set_column_spacing(12);
-
-        status_label = new Gtk.Label(_("Status"));
+        status_label = new Gtk.Label(_("Current Status"));
         status_label.set_halign(Gtk.Align.START);
 
         var status_renderer = new Gtk.CellRendererText();
@@ -126,100 +186,116 @@ public class StatusDotWindow : Budgie.Popover {
             1, "Busy"
         );
 
-        top_grid.attach(status_label, 0, 0);
-        top_grid.attach(status_combobox, 1, 0);
+        grid.attach(invisibility_label, 0, 0);
+        grid.attach(invisibility_switch, 1, 0);
+        grid.attach(status_label, 0, 1);
+        grid.attach(status_combobox, 1, 1);
 
-        container.pack_start(top_grid, true, true, 0);
-        add(container);
+        box.pack_start(grid, true, true, 0);
 
-        /*
-        Initial state.
-        */
-        set_status(StatusEnum.OFFLINE);
-        set_invisibility(true);
-
-        /*
-        Events wiring.
-        */
-        settings.changed["statusdot-state"].connect(() => {
-            int value = settings.get_int("statusdot-state");
-            StatusEnum status = (StatusEnum) value;
-
-            set_status(status);
-        });
-
-        settings.changed["statusdot-invisible"].connect(() => {
-            bool invisible = settings.get_boolean("statusdot-invisible");
-
-            set_invisibility(invisible);
-        });
+        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
+        hbox_buttons.set_halign(Gtk.Align.START);
+        var button_settings = create_icon_button("emblem-system-symbolic", "Settings");
+        hbox_buttons.add(button_settings);
+        box.pack_end(hbox_buttons, false, false, 0);
 
         status_combobox.changed.connect(() => {
-            print("combobox changed → %s\n", status_combobox.get_active_id());
             StatusEnum status = get_status();
-
-            int old_value = settings.get_int("statusdot-state");
-            int new_value = (int) status;
-            print("GSettings change: old=%d, new=%d\n", old_value, new_value);
 
             settings.set_int("statusdot-state", (int) status);
         });
 
         invisibility_id = invisibility_switch.notify["active"].connect(() => {
             SignalHandler.block(invisibility_switch, invisibility_id);
-            bool invisible = !invisibility_switch.get_active();
+            bool invisible = invisibility_switch.get_active();
             settings.set_boolean("statusdot-invisible", invisible);
             set_invisibility(invisible);
             SignalHandler.unblock(invisibility_switch, invisibility_id);
         });
 
-        this.show_all();
+        button_settings.clicked.connect(() => switch_to_settings());
+
+        return box;
     }
 
-    private void set_status(StatusEnum status) {
-        status_combobox.set_active_id("%d".printf(status));
+    private Gtk.Box build_settings_view() {
+        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
+
+        var grid = new Gtk.Grid();
+        grid.set_row_spacing(6);
+        grid.set_column_spacing(6);
+
+        var label_baseurl_title = new Gtk.Label("Base URL:");
+        label_baseurl_title.set_halign(Gtk.Align.END);
+        var label_apikey_title = new Gtk.Label("API Key:");
+        label_apikey_title.set_halign(Gtk.Align.END);
+
+        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        //string current_api_token = lookup_api_token() ?? "";
+
+        var entry_baseurl = new Gtk.Entry();
+        entry_baseurl.set_hexpand(true);
+        entry_baseurl.set_halign(Gtk.Align.FILL);
+        entry_baseurl.set_text(current_base_url);
+
+        var entry_apikey = new Gtk.Entry();
+        entry_apikey.set_hexpand(true);
+        entry_apikey.set_halign(Gtk.Align.FILL);
+        //entry_apikey.set_text(current_api_token);
+        entry_apikey.visibility = false;
+
+        grid.attach(label_baseurl_title, 0, 0, 1, 1);
+        grid.attach(entry_baseurl, 1, 0, 1, 1);
+        grid.attach(label_apikey_title, 0, 1, 1, 1);
+        grid.attach(entry_apikey, 1, 1, 1, 1);
+        box.add(grid);
+
+        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
+        hbox_buttons.set_halign(Gtk.Align.START);
+        var button_back = create_icon_button("go-previous-symbolic", "Back");
+        var button_save = create_icon_button("document-save-symbolic", "Save");
+        hbox_buttons.add(button_back);
+        hbox_buttons.add(button_save);
+        box.pack_end(hbox_buttons, false, false, 0);
+
+        button_back.clicked.connect(() => switch_to_main());
+        button_save.clicked.connect(() => {
+            /*string new_base_url = entry_baseurl.get_text() ?? "";
+            string new_api_token = entry_apitoken.get_text() ?? "";
+
+            settings?.set_string("kimai-api-baseurl", new_base_url);
+            store_api_token(new_api_token);
+
+            api = new KimaiAPI(new_base_url, new_api_token);
+
+            try {
+                api.validate_connection();
+                hide_warning();
+                refresh_combobox_data();
+                settings.set_boolean("warning-persistent", false);
+            } catch (GLib.Error e) {
+                show_warning("%s".printf(e.message));
+                settings.set_boolean("warning-persistent", true);
+            }
+
+            timer_manager.set_api(api);
+            timer_manager.refresh_from_server();*/
+
+            switch_to_main();
+        });
+
+        return box;
     }
 
-    private StatusEnum get_status() {
-        string? id = status_combobox.get_active_id();
-
-        if (id != null) {
-            return (StatusEnum) int.parse(id);
-        }
-
-        return StatusEnum.OFFLINE;
+    private void switch_to_main() {
+        stack.set_visible_child_name("main");
     }
 
-    private void set_invisibility(bool invisible) {
-        bool visible = !invisible;
-
-        if (invisibility_switch.get_active() != visible) {
-            invisibility_switch.set_active(visible);
-        }
-
-        status_combobox.set_sensitive(visible);
-        status_label.set_sensitive(visible);
+    private void switch_to_settings() {
+        stack.set_visible_child_name("settings");
     }
 
-    /*private Gtk.Button create_icon_button(string icon_name, string label_text) {
-        var hbox = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        var image = new Gtk.Image.from_icon_name(icon_name, Gtk.IconSize.BUTTON);
-
-        var label = new Gtk.Label(label_text);
-        label.set_halign(Gtk.Align.START);
-
-        hbox.pack_start(image, false, false, 0);
-        hbox.pack_start(label, false, false, 0);
-
-        hbox.set_halign(Gtk.Align.CENTER);
-        hbox.set_valign(Gtk.Align.CENTER);
-
-        var button = new Gtk.Button();
-        button.add(hbox);
-
-        return button;
-    }
-
+    /*
     private Gtk.Box build_warning_box() {
         var css_provider = new Gtk.CssProvider();
 

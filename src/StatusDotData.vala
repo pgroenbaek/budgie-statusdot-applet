@@ -28,9 +28,9 @@ public enum StatusEnum {
 
 public class Status : GLib.Object {
     public StatusEnum status { get; set; }
-    public int? expirationTtl { get; set; }
+    public int expirationTtl { get; set; }
 
-    public Status(StatusEnum status, int? expirationTtl) {
+    public Status(StatusEnum status, int expirationTtl) {
         this.status = status;
         this.expirationTtl = expirationTtl;
     }

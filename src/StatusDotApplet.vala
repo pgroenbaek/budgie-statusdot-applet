@@ -54,24 +54,18 @@ public class StatusDotApplet : Budgie.Applet {
         statusdot_active_green = "statusdot-active-green";
 
         event_box = new Gtk.EventBox();
-        this.add(event_box);
         applet_icon = new Gtk.Image.from_icon_name(get_current_mode_icon(), Gtk.IconSize.MENU);
         event_box.add(applet_icon);
+        this.add(event_box);
 
         popover = new StatusDotWindow(event_box, settings);
         
         settings.changed["statusdot-state"].connect(() => {
-            print("statusdot-state changed\n");
             update_icon();
         });
 
         settings.changed["statusdot-invisible"].connect(() => {
-            print("statusdot-invisible changed\n");
             update_icon();
-        });
-
-        settings.changed.connect((key) => {
-            print("GSettings key changed: %s\n", key);
         });
 
         event_box.button_press_event.connect((e) => {
