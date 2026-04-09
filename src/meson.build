@@ -9,7 +9,7 @@ secret_dep = dependency('libsecret-1', required: true)
 
 applet_statusdot_sources = [
   #'StatusDotAPI.vala',
-  #'StatusDotData.vala',
+  'StatusDotData.vala',
   #'StatusDotManager.vala',
   'StatusDotApplet.vala',
   'StatusDotSettings.vala',

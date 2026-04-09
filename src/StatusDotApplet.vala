@@ -59,9 +59,19 @@ public class StatusDotApplet : Budgie.Applet {
         event_box.add(applet_icon);
 
         popover = new StatusDotWindow(event_box, settings);
-
+        
         settings.changed["statusdot-state"].connect(() => {
+            print("statusdot-state changed\n");
             update_icon();
+        });
+
+        settings.changed["statusdot-invisible"].connect(() => {
+            print("statusdot-invisible changed\n");
+            update_icon();
+        });
+
+        settings.changed.connect((key) => {
+            print("GSettings key changed: %s\n", key);
         });
 
         event_box.button_press_event.connect((e) => {
@@ -81,8 +91,30 @@ public class StatusDotApplet : Budgie.Applet {
     }
 
     private string get_current_mode_icon() {
-        bool running = settings.get_boolean("statusdot-state");
-        string state_icon = (running) ? timetracker_active : timetracker_inactive;
+        bool invisible = settings.get_boolean("statusdot-invisible");
+        if (invisible) {
+            return statusdot_invisible;
+        }
+
+        int value = settings.get_int("statusdot-state");
+        StatusEnum status = (StatusEnum) value;
+        var state_icon = statusdot_active_red;
+
+        switch (status) {
+            case StatusEnum.OFFLINE:
+                state_icon = statusdot_active_red;
+                break;
+            case StatusEnum.ONLINE:
+                state_icon = statusdot_active_green;
+                break;
+            case StatusEnum.AWAY:
+                state_icon = statusdot_active_orange;
+                break;
+            case StatusEnum.BUSY:
+                state_icon = statusdot_active_red;
+                break;
+        }
+
         return state_icon;
     }
 

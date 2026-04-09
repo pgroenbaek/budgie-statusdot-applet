@@ -24,4 +24,4 @@ Description[zh_CN]=管理 Statusdot API 的状态
 Authors=Peter Grønbæk Andersen
 Copyright=© 2026 Peter Grønbæk Andersen
 Website=https://github.com/pgroenbaek/budgie-statusdot-applet
-Icon=statusdot-invisible
+Icon=statusdot

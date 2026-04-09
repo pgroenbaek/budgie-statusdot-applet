@@ -3,7 +3,12 @@
     <key name="statusdot-state" type="i">
       <default>0</default>
       <summary>Status of the status dot</summary>
-      <description>-1 = INVISIBLE, 0 = OFFLINE, 1 = ONLINE, 2 = AWAY, 3 = BUSY</description>
+      <description>0 = OFFLINE, 1 = ONLINE, 2 = AWAY, 3 = BUSY</description>
+    </key>
+    <key name="statusdot-invisible" type="b">
+      <default>true</default>
+      <summary>Make the status dot invisible</summary>
+      <description>Whether to make the status dot invisible regardless of what it is set to</description>
     </key>
     <key name="statusdot-api-baseurl" type="s">
       <default>''</default>

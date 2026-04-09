@@ -24,10 +24,13 @@ using Secret;
 using Budgie;
 
 public class StatusDotWindow : Budgie.Popover {
-    //private StatusDotAPI api;
-    //private StatusDotManager statusdot_manager;
 
-    private Secret.Schema api_key_schema;
+    private Gtk.Switch? invisibility_switch = null;
+    private Gtk.ComboBox? status_combobox = null;
+    private Gtk.ListStore? status_store = null;
+    private Gtk.Label? status_label = null;
+
+    private ulong invisibility_id;
 
     private unowned GLib.Settings? settings;
 
@@ -36,77 +39,169 @@ public class StatusDotWindow : Budgie.Popover {
         settings = c_settings;
         get_style_context().add_class("statusdot-popover");
 
-        api_key_schema = new Secret.Schema(
-            "io.grnbk.statusdotapplet",
-            Secret.SchemaFlags.NONE,
-            "api-key",
-            Secret.SchemaAttributeType.STRING
-        );
+        var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
+        container.get_style_context().add_class("container");
 
-        string base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
-        string api_key = lookup_api_key() ?? "";
-
-        var vbox = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
-        vbox.set_margin_top(6);
-        vbox.set_margin_bottom(6);
-        vbox.set_margin_start(6);
-        vbox.set_margin_end(6);
-        vbox.set_size_request(300, -1);
-        add(vbox);
-
-        /*api = new StatusDotAPI(base_url, api_key);
-        statusdot_manager = new StatusDotManager(api, c_settings);
+        var css = new Gtk.CssProvider();
 
         try {
-            api.validate_connection();
-            hide_warning();
-            settings.set_boolean("warning-persistent", false);
+            css.load_from_data("label.bold-grey { font-weight: bold; color: #8d939e; }");
         } catch (GLib.Error e) {
-            show_warning("%s".printf(e.message));
-            settings.set_boolean("warning-persistent", true);
-        }*/
+            // ignore
+        }
 
-        main_view = build_main_view();
-        settings_view = build_settings_view();
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
 
-        stack = new Gtk.Stack();
-        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
-        stack.set_transition_duration(250);
-        stack.add_named(main_view, "main");
-        stack.add_named(form_view, "form");
-        stack.add_named(settings_view, "settings");
-        vbox.add(stack);
+        /*
+        Top box with title and enabled switch.
+        */
+        var top_box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+        top_box.set_hexpand(true);
 
-        /*statusdot_manager.connected.connect(() => {
-            hide_warning();
-            settings.set_boolean("warning-persistent", false);
-        });
-        statusdot_manager.disconnected.connect(() => {
-            show_warning("No internet connection");
-            settings.set_boolean("warning-persistent", true);
-        });
-        statusdot_manager.updated.connect(() => {
-            update_buttons();
-            update_labels();
-        });
-        statusdot_manager.stopped.connect(() => {
-            update_buttons();
-            label_duration.set_text("00:00:00");
-        });
-        statusdot_manager.refresh_from_server();*/
+        var title_label = new Gtk.Label("Status Dot");
+        title_label.get_style_context().add_class("bold-grey");
+        title_label.set_halign(Gtk.Align.START);
+        title_label.set_hexpand(true);
+        top_box.pack_start(title_label, true, true, 0);
 
-        this.show.connect(() => {
-            var warning_persistent = settings.get_boolean("warning-persistent");
-            var warning_text = warning_label?.get_text() ?? "";
+        invisibility_switch = new Gtk.Switch();
+        invisibility_switch.set_halign(Gtk.Align.END);
+        invisibility_switch.set_margin_start(6);
+        top_box.set_margin_start(3);
+        top_box.set_margin_end(3);
+        top_box.pack_start(invisibility_switch, false, false, 0);
 
-            if (!warning_persistent || warning_text == null || warning_text == "") {
-                hide_warning();
-            }
+        var top_seperator = new Gtk.Separator(Orientation.HORIZONTAL);
+        top_seperator.set_margin_top(2);
+        top_seperator.set_margin_bottom(2);
+
+        top_box.set_size_request(-1, 30);
+        container.pack_start(top_box, true, true, 0);
+        container.pack_start(top_seperator, false, false, 0);
+
+        /*
+        Top grid with device selection.
+        */
+        var top_grid = new Gtk.Grid();
+        top_grid.set_row_spacing(6);
+        top_grid.set_column_spacing(12);
+
+        status_label = new Gtk.Label(_("Status"));
+        status_label.set_halign(Gtk.Align.START);
+
+        var status_renderer = new Gtk.CellRendererText();
+        status_store = new Gtk.ListStore(2, typeof(string), typeof(string));
+        status_combobox = new Gtk.ComboBox();
+        status_combobox.set_model(status_store);
+        status_combobox.set_id_column(0);
+        status_combobox.pack_start(status_renderer, true);
+        status_combobox.add_attribute(status_renderer, "text", 1);
+        status_combobox.set_halign(Gtk.Align.END);
+        status_combobox.set_hexpand(true);
+        status_combobox.set_size_request(90, -1);
+
+        Gtk.TreeIter iter;
+        status_store.append(out iter);
+        status_store.set(iter,
+            0, "%d".printf(StatusEnum.OFFLINE),
+            1, "Offline"
+        );
+        status_store.append(out iter);
+        status_store.set(iter,
+            0, "%d".printf(StatusEnum.ONLINE),
+            1, "Online"
+        );
+        status_store.append(out iter);
+        status_store.set(iter,
+            0, "%d".printf(StatusEnum.AWAY),
+            1, "Away"
+        );
+        status_store.append(out iter);
+        status_store.set(iter,
+            0, "%d".printf(StatusEnum.BUSY),
+            1, "Busy"
+        );
+
+        top_grid.attach(status_label, 0, 0);
+        top_grid.attach(status_combobox, 1, 0);
+
+        container.pack_start(top_grid, true, true, 0);
+        add(container);
+
+        /*
+        Initial state.
+        */
+        set_status(StatusEnum.OFFLINE);
+        set_invisibility(true);
+
+        /*
+        Events wiring.
+        */
+        settings.changed["statusdot-state"].connect(() => {
+            int value = settings.get_int("statusdot-state");
+            StatusEnum status = (StatusEnum) value;
+
+            set_status(status);
         });
+
+        settings.changed["statusdot-invisible"].connect(() => {
+            bool invisible = settings.get_boolean("statusdot-invisible");
+
+            set_invisibility(invisible);
+        });
+
+        status_combobox.changed.connect(() => {
+            print("combobox changed → %s\n", status_combobox.get_active_id());
+            StatusEnum status = get_status();
+
+            int old_value = settings.get_int("statusdot-state");
+            int new_value = (int) status;
+            print("GSettings change: old=%d, new=%d\n", old_value, new_value);
+
+            settings.set_int("statusdot-state", (int) status);
+        });
+
+        invisibility_id = invisibility_switch.notify["active"].connect(() => {
+            SignalHandler.block(invisibility_switch, invisibility_id);
+            bool invisible = !invisibility_switch.get_active();
+            settings.set_boolean("statusdot-invisible", invisible);
+            set_invisibility(invisible);
+            SignalHandler.unblock(invisibility_switch, invisibility_id);
+        });
+
         this.show_all();
     }
 
-    private Gtk.Button create_icon_button(string icon_name, string label_text) {
+    private void set_status(StatusEnum status) {
+        status_combobox.set_active_id("%d".printf(status));
+    }
+
+    private StatusEnum get_status() {
+        string? id = status_combobox.get_active_id();
+
+        if (id != null) {
+            return (StatusEnum) int.parse(id);
+        }
+
+        return StatusEnum.OFFLINE;
+    }
+
+    private void set_invisibility(bool invisible) {
+        bool visible = !invisible;
+
+        if (invisibility_switch.get_active() != visible) {
+            invisibility_switch.set_active(visible);
+        }
+
+        status_combobox.set_sensitive(visible);
+        status_label.set_sensitive(visible);
+    }
+
+    /*private Gtk.Button create_icon_button(string icon_name, string label_text) {
         var hbox = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
         var image = new Gtk.Image.from_icon_name(icon_name, Gtk.IconSize.BUTTON);
 
@@ -222,7 +317,7 @@ public class StatusDotWindow : Budgie.Popover {
             settings?.set_string("statusdot-api-baseurl", new_base_url);
             store_api_key(new_api_key);
 
-            /*api = new StatusDotAPI(new_base_url, new_api_key);
+            api = new StatusDotAPI(new_base_url, new_api_key);
 
             try {
                 api.validate_connection();
@@ -235,7 +330,7 @@ public class StatusDotWindow : Budgie.Popover {
             }
 
             statusdot_manager.set_api(api);
-            statusdot_manager.refresh_from_server();*/
+            statusdot_manager.refresh_from_server();
 
             switch_to_main();
         });
@@ -252,7 +347,7 @@ public class StatusDotWindow : Budgie.Popover {
     }
 
     private void refresh_combobox_data() {
-        /*api.get_customers.begin((obj, res) => {
+        api.get_customers.begin((obj, res) => {
             try {
                 var customers = api.get_customers.end(res);
                 foreach (var customer in customers) {
@@ -261,7 +356,7 @@ public class StatusDotWindow : Budgie.Popover {
             } catch (GLib.Error e) {
                 show_warning("Could not fetch customers: %s".printf(e.message));
             }
-        });*/
+        });
     }
 
     private void update_labels() {
@@ -332,5 +427,5 @@ public class StatusDotWindow : Budgie.Popover {
         } catch (GLib.Error e) {
             show_warning("Could not store API key: %s".printf(e.message));
         }
-    }
+    }*/
 }
