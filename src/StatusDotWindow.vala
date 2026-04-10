@@ -23,20 +23,6 @@ using Gtk;
 using Secret;
 using Budgie;
 
-/*
-TODO Settings:
-    - api key
-	- api baseurl
-	- working hours start
-	- working hours end
-	- never show online outside working hours checkbox
-	- show away as offline checkbox
-	- away after x minutes idle
-	- away duration before going offline (x minutes)
-TODO UI:
-    - Togglebutton status change
-*/
-
 public class StatusDotWindow : Budgie.Popover {
 
     private Gtk.Switch? invisibility_switch = null;
@@ -209,75 +195,6 @@ public class StatusDotWindow : Budgie.Popover {
         return box;
     }
 
-    /*private Gtk.Box build_settings_view() {
-        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
-
-        var grid = new Gtk.Grid();
-        grid.set_row_spacing(6);
-        grid.set_column_spacing(6);
-
-        var label_baseurl_title = new Gtk.Label("Base URL:");
-        label_baseurl_title.set_halign(Gtk.Align.END);
-        var label_apikey_title = new Gtk.Label("API Key:");
-        label_apikey_title.set_halign(Gtk.Align.END);
-
-        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
-        //string current_api_token = lookup_api_token() ?? "";
-
-        var entry_baseurl = new Gtk.Entry();
-        entry_baseurl.set_hexpand(true);
-        entry_baseurl.set_halign(Gtk.Align.FILL);
-        entry_baseurl.set_text(current_base_url);
-
-        var entry_apikey = new Gtk.Entry();
-        entry_apikey.set_hexpand(true);
-        entry_apikey.set_halign(Gtk.Align.FILL);
-        //entry_apikey.set_text(current_api_token);
-        entry_apikey.visibility = false;
-
-        grid.attach(label_baseurl_title, 0, 0, 1, 1);
-        grid.attach(entry_baseurl, 1, 0, 1, 1);
-        grid.attach(label_apikey_title, 0, 1, 1, 1);
-        grid.attach(entry_apikey, 1, 1, 1, 1);
-        box.add(grid);
-
-        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        hbox_buttons.set_halign(Gtk.Align.END);
-        var button_back = create_icon_button("go-previous-symbolic", "Back");
-        var button_save = create_icon_button("document-save-symbolic", "Save");
-        hbox_buttons.add(button_back);
-        hbox_buttons.add(button_save);
-        box.pack_end(hbox_buttons, false, false, 0);
-
-        button_back.clicked.connect(() => switch_to_main());
-        button_save.clicked.connect(() => {
-            string new_base_url = entry_baseurl.get_text() ?? "";
-            string new_api_token = entry_apitoken.get_text() ?? "";
-
-            settings?.set_string("kimai-api-baseurl", new_base_url);
-            store_api_token(new_api_token);
-
-            api = new KimaiAPI(new_base_url, new_api_token);
-
-            try {
-                api.validate_connection();
-                hide_warning();
-                refresh_combobox_data();
-                settings.set_boolean("warning-persistent", false);
-            } catch (GLib.Error e) {
-                show_warning("%s".printf(e.message));
-                settings.set_boolean("warning-persistent", true);
-            }
-
-            timer_manager.set_api(api);
-            timer_manager.refresh_from_server();
-
-            switch_to_main();
-        });
-
-        return box;
-    }*/
-
     private Gtk.Box build_settings_view() {
         var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
 
@@ -309,21 +226,6 @@ public class StatusDotWindow : Budgie.Popover {
         grid.attach(label_apikey_title, 0, 1, 1, 1);
         grid.attach(entry_apikey, 1, 1, 1, 1);
 
-        /*var label_work_start = new Gtk.Label("Working hours start:");
-        label_work_start.set_halign(Gtk.Align.END);
-        var time_work_start = new Gtk.SpinButton.with_range(0, 23, 1);
-        time_work_start.set_hexpand(true);
-
-        grid.attach(label_work_start, 0, 2, 1, 1);
-        grid.attach(time_work_start, 1, 2, 1, 1);
-
-        var label_work_end = new Gtk.Label("Working hours end:");
-        label_work_end.set_halign(Gtk.Align.END);
-        var time_work_end = new Gtk.SpinButton.with_range(0, 23, 1);
-        time_work_end.set_hexpand(true);
-
-        grid.attach(label_work_end, 0, 3, 1, 1);
-        grid.attach(time_work_end, 1, 3, 1, 1);*/// ---------- WORK START ----------
         var label_work_start = new Gtk.Label("Working hours start:");
         label_work_start.set_halign(Gtk.Align.END);
 
@@ -349,7 +251,6 @@ public class StatusDotWindow : Budgie.Popover {
         grid.attach(label_work_start, 0, 2, 1, 1);
         grid.attach(time_work_start, 1, 2, 1, 1);
 
-        // ---------- WORK END ----------
         var label_work_end = new Gtk.Label("Working hours end:");
         label_work_end.set_halign(Gtk.Align.END);
 
