@@ -2,8 +2,8 @@ build/src/libstatusdotapplet.so usr/lib/budgie-desktop/plugins/statusdot-applet
 data/statusdotapplet.plugin usr/lib/budgie-desktop/plugins/statusdot-applet
 data/statusdot.svg usr/share/icons/hicolor/16x16/status/
 data/statusdot-invisible.svg usr/share/icons/hicolor/16x16/status/
-data/statusdot-active-red.svg usr/share/icons/hicolor/16x16/status/
-data/statusdot-active-red-busy.svg usr/share/icons/hicolor/16x16/status/
-data/statusdot-active-orange.svg usr/share/icons/hicolor/16x16/status/
-data/statusdot-active-green.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-online.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-away.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-offline.svg usr/share/icons/hicolor/16x16/status/
+data/statusdot-active-busy.svg usr/share/icons/hicolor/16x16/status/
 data/io.grnbk.statusdotapplet.gschema.xml usr/share/glib-2.0/schemas/

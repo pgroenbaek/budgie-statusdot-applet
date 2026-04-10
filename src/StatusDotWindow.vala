@@ -23,6 +23,19 @@ using Gtk;
 using Secret;
 using Budgie;
 
+/*
+TODO Settings:
+    - api key
+	- api baseurl
+	- working hours
+	- never show online outside working hours checkbox
+	- show away as offline checkbox
+	- away after x minutes idle
+	- away duration before going offline (x minutes)
+TODO UI:
+    - Togglebutton status change
+*/
+
 public class StatusDotWindow : Budgie.Popover {
 
     private Gtk.Switch? invisibility_switch = null;
@@ -31,9 +44,14 @@ public class StatusDotWindow : Budgie.Popover {
     private Gtk.Box? main_view = null;
     private Gtk.Box? settings_view = null;
 
+    private Gtk.Label warning_label;
+    private Gtk.Box warning_box;
+
     private GLib.List<Gtk.ToggleButton> status_toggles = new GLib.List<Gtk.ToggleButton>();
 
     private ulong invisibility_id;
+
+    private Secret.Schema api_key_schema;
 
     private unowned GLib.Settings? settings;
 
@@ -42,8 +60,21 @@ public class StatusDotWindow : Budgie.Popover {
         settings = c_settings;
         get_style_context().add_class("statusdot-popover");
 
+        api_key_schema = new Secret.Schema(
+            "io.grnbk.statusdotapplet",
+            Secret.SchemaFlags.NONE,
+            "api-key",
+            Secret.SchemaAttributeType.STRING
+        );
+
         var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         container.get_style_context().add_class("container");
+
+        /*
+        Warning box
+        */
+        warning_box = build_warning_box();
+        container.pack_start(warning_box, false, false, 0);
 
         /*
         Stack with main and settings ui.
@@ -84,22 +115,20 @@ public class StatusDotWindow : Budgie.Popover {
 
             set_invisibility(invisible);
         });
+        
+        this.show.connect(() => {
+            var warning_persistent = settings.get_boolean("warning-persistent");
+            var warning_text = warning_label?.get_text() ?? "";
 
+            if (!warning_persistent || warning_text == null || warning_text == "") {
+                hide_warning();
+            }
+        });
         this.show_all();
     }
 
     private void set_status(StatusEnum status) {
-        //status_combobox.set_active_id("%d".printf(status));
-    }
-
-    private StatusEnum get_status() {
-        /*string? id = status_combobox.get_active_id();
-
-        if (id != null) {
-            return (StatusEnum) int.parse(id);
-        }*/
-
-        return StatusEnum.OFFLINE;
+        
     }
 
     private void set_invisibility(bool invisible) {
@@ -165,12 +194,6 @@ public class StatusDotWindow : Budgie.Popover {
         hbox_buttons.add(status_toggles_bar);
         hbox_buttons.add(button_settings);
         box.pack_end(hbox_buttons, false, false, 0);
-
-        /*status_combobox.changed.connect(() => {
-            StatusEnum status = get_status();
-
-            settings.set_int("statusdot-state", (int) status);
-        });*/
 
         invisibility_id = invisibility_switch.notify["active"].connect(() => {
             SignalHandler.block(invisibility_switch, invisibility_id);
@@ -263,6 +286,13 @@ public class StatusDotWindow : Budgie.Popover {
     }
 
     private GLib.List<Gtk.ToggleButton> build_status_toggles(Gtk.Box status_toggles_bar) {
+        StatusEnum[] button_values = {
+            StatusEnum.ONLINE,
+            StatusEnum.AWAY,
+            StatusEnum.OFFLINE,
+            StatusEnum.BUSY
+        };
+
         string[] tooltips = {
             "Online",
             "Away",
@@ -271,10 +301,10 @@ public class StatusDotWindow : Budgie.Popover {
         };
 
         string[] icon_names = {
-            "statusdot-active-green",
-            "statusdot-active-orange",
-            "statusdot-active-red",
-            "statusdot-active-red-busy",
+            "statusdot-active-online",
+            "statusdot-active-away",
+            "statusdot-active-offline",
+            "statusdot-active-busy",
         };
 
         foreach (var child in status_toggles_bar.get_children()) {
@@ -284,15 +314,30 @@ public class StatusDotWindow : Budgie.Popover {
         var first_toggle_button = (Gtk.ToggleButton?) null;
         var toggle_buttons = new GLib.List<Gtk.ToggleButton>();
 
-        for (int i = 0; i < tooltips.length; i++) {
+        for (int i = 0; i < button_values.length; i++) {
+            var status = button_values[i];
             var button_icon = new Gtk.Image.from_icon_name(icon_names[i], Gtk.IconSize.BUTTON);
             var button = new Gtk.ToggleButton();
             button.add(button_icon);
             button.set_tooltip_text(tooltips[i]);
             button.set_hexpand(true);
+            button.add_events(Gdk.EventMask.BUTTON_PRESS_MASK);
 
-            button.toggled.connect(() => {
-                //update_notebook_visibility(button);
+            button.button_press_event.connect((event) => {
+                if (button.get_active()) {
+                    return true;
+                }
+
+                foreach (var other in status_toggles) {
+                    if (other != button) {
+                        other.set_active(false);
+                    }
+                }
+
+                button.set_active(true);
+                settings.set_int("statusdot-state", (int) status);
+
+                return true;
             });
 
             toggle_buttons.append(button);
@@ -310,20 +355,6 @@ public class StatusDotWindow : Budgie.Popover {
         return toggle_buttons;
     }
 
-    private int get_status_toggles_index(Gtk.ToggleButton button) {
-        int index = 0;
-
-        for (unowned GLib.List<Gtk.ToggleButton>? l = status_toggles; l != null; l = l.next) {
-            if (l.data == button) {
-                return index;
-            }
-            index++;
-        }
-
-        return -1;
-    }
-
-    /*
     private Gtk.Box build_warning_box() {
         var css_provider = new Gtk.CssProvider();
 
@@ -367,131 +398,6 @@ public class StatusDotWindow : Budgie.Popover {
         return box;
     }
 
-    private Gtk.Box build_main_view() {
-        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
-
-
-        return box;
-    }
-
-    private Gtk.Box build_settings_view() {
-        var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 6);
-
-        var grid = new Gtk.Grid();
-        grid.set_row_spacing(6);
-        grid.set_column_spacing(6);
-
-        var label_baseurl_title = new Gtk.Label("Base URL:");
-        label_baseurl_title.set_halign(Gtk.Align.END);
-        var label_apitoken_title = new Gtk.Label("API Token:");
-        label_apitoken_title.set_halign(Gtk.Align.END);
-
-        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
-        string current_api_key = lookup_api_key() ?? "";
-
-        var entry_baseurl = new Gtk.Entry();
-        entry_baseurl.set_hexpand(true);
-        entry_baseurl.set_halign(Gtk.Align.FILL);
-        entry_baseurl.set_text(current_base_url);
-
-        var entry_apitoken = new Gtk.Entry();
-        entry_apitoken.set_hexpand(true);
-        entry_apitoken.set_halign(Gtk.Align.FILL);
-        entry_apitoken.set_text(current_api_key);
-        entry_apitoken.visibility = false;
-
-        grid.attach(label_baseurl_title, 0, 0, 1, 1);
-        grid.attach(entry_baseurl, 1, 0, 1, 1);
-        grid.attach(label_apitoken_title, 0, 1, 1, 1);
-        grid.attach(entry_apitoken, 1, 1, 1, 1);
-        box.add(grid);
-
-        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        var button_back = create_icon_button("go-previous-symbolic", "Back");
-        var button_save = create_icon_button("document-save-symbolic", "Save");
-        hbox_buttons.add(button_back);
-        hbox_buttons.add(button_save);
-        box.pack_end(hbox_buttons, false, false, 0);
-
-        button_back.clicked.connect(() => switch_to_main());
-        button_save.clicked.connect(() => {
-            string new_base_url = entry_baseurl.get_text() ?? "";
-            string new_api_key = entry_apitoken.get_text() ?? "";
-
-            settings?.set_string("statusdot-api-baseurl", new_base_url);
-            store_api_key(new_api_key);
-
-            api = new StatusDotAPI(new_base_url, new_api_key);
-
-            try {
-                api.validate_connection();
-                hide_warning();
-                refresh_combobox_data();
-                settings.set_boolean("warning-persistent", false);
-            } catch (GLib.Error e) {
-                show_warning("%s".printf(e.message));
-                settings.set_boolean("warning-persistent", true);
-            }
-
-            statusdot_manager.set_api(api);
-            statusdot_manager.refresh_from_server();
-
-            switch_to_main();
-        });
-
-        return box;
-    }
-
-    private void switch_to_main() {
-        stack.set_visible_child_name("main");
-    }
-
-    private void switch_to_settings() {
-        stack.set_visible_child_name("settings");
-    }
-
-    private void refresh_combobox_data() {
-        api.get_customers.begin((obj, res) => {
-            try {
-                var customers = api.get_customers.end(res);
-                foreach (var customer in customers) {
-                    combobox_customer.append(customer.id.to_string(), customer.name);
-                }
-            } catch (GLib.Error e) {
-                show_warning("Could not fetch customers: %s".printf(e.message));
-            }
-        });
-    }
-
-    private void update_labels() {
-        label_customer.set_text(statusdot_manager.customer);
-        label_project.set_text(statusdot_manager.project);
-        label_activity.set_text(statusdot_manager.activity);
-        label_description.set_text(statusdot_manager.description);
-
-        int hours = statusdot_manager.elapsed_seconds / 3600;
-        int minutes = (statusdot_manager.elapsed_seconds % 3600) / 60;
-        int seconds = statusdot_manager.elapsed_seconds % 60;
-
-        label_duration.set_text("%02d:%02d:%02d".printf(hours, minutes, seconds));
-    }
-
-    private void update_buttons() {
-        var is_running = settings.get_boolean("timetracker-running");
-
-        if (is_running) {
-            button_start.set_sensitive(false);
-            button_stop.set_sensitive(true);
-            button_new.set_sensitive(false);
-        }
-        else {
-            var show_start = has_last_timesheet() ? true : false;
-            button_start.set_sensitive(show_start);
-            button_stop.set_sensitive(false);
-            button_new.set_sensitive(true);
-        }
-    }
-
     private void show_warning(string message) {
         warning_label.set_text(message);
         warning_box.show();
@@ -521,7 +427,7 @@ public class StatusDotWindow : Budgie.Popover {
             Secret.password_store_sync(
                 api_key_schema,
                 null,
-                "Statusdot API token",
+                "Statusdot API key",
                 token,
                 null,
                 "api-key",
@@ -531,5 +437,5 @@ public class StatusDotWindow : Budgie.Popover {
         } catch (GLib.Error e) {
             show_warning("Could not store API key: %s".printf(e.message));
         }
-    }*/
+    }
 }

@@ -37,10 +37,10 @@ public class StatusDotApplet : Budgie.Applet {
     private GLib.Settings? settings;
 
     private string? statusdot_invisible;
-    private string? statusdot_active_red;
-    private string? statusdot_active_red_busy;
-    private string? statusdot_active_orange;
-    private string? statusdot_active_green;
+    private string? statusdot_online;
+    private string? statusdot_away;
+    private string? statusdot_offline;
+    private string? statusdot_busy;
 
     public string uuid { public set; public get; }
 
@@ -50,10 +50,10 @@ public class StatusDotApplet : Budgie.Applet {
         settings = new GLib.Settings("io.grnbk.statusdotapplet");
 
         statusdot_invisible = "statusdot-invisible";
-        statusdot_active_red = "statusdot-active-red";
-        statusdot_active_red_busy = "statusdot-active-red-busy";
-        statusdot_active_orange = "statusdot-active-orange";
-        statusdot_active_green = "statusdot-active-green";
+        statusdot_online = "statusdot-active-online";
+        statusdot_away = "statusdot-active-away";
+        statusdot_offline = "statusdot-active-offline";
+        statusdot_busy = "statusdot-active-busy";
 
         event_box = new Gtk.EventBox();
         applet_icon = new Gtk.Image.from_icon_name(get_current_mode_icon(), Gtk.IconSize.MENU);
@@ -98,16 +98,16 @@ public class StatusDotApplet : Budgie.Applet {
 
         switch (status) {
             case StatusEnum.OFFLINE:
-                state_icon = statusdot_active_red;
+                state_icon = statusdot_offline;
                 break;
             case StatusEnum.ONLINE:
-                state_icon = statusdot_active_green;
+                state_icon = statusdot_online;
                 break;
             case StatusEnum.AWAY:
-                state_icon = statusdot_active_orange;
+                state_icon = statusdot_away;
                 break;
             case StatusEnum.BUSY:
-                state_icon = statusdot_active_red_busy;
+                state_icon = statusdot_busy;
                 break;
         }
 
