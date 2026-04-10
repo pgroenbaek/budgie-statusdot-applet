@@ -38,6 +38,7 @@ public class StatusDotApplet : Budgie.Applet {
 
     private string? statusdot_invisible;
     private string? statusdot_active_red;
+    private string? statusdot_active_red_busy;
     private string? statusdot_active_orange;
     private string? statusdot_active_green;
 
@@ -50,6 +51,7 @@ public class StatusDotApplet : Budgie.Applet {
 
         statusdot_invisible = "statusdot-invisible";
         statusdot_active_red = "statusdot-active-red";
+        statusdot_active_red_busy = "statusdot-active-red-busy";
         statusdot_active_orange = "statusdot-active-orange";
         statusdot_active_green = "statusdot-active-green";
 
@@ -105,7 +107,7 @@ public class StatusDotApplet : Budgie.Applet {
                 state_icon = statusdot_active_orange;
                 break;
             case StatusEnum.BUSY:
-                state_icon = statusdot_active_red;
+                state_icon = statusdot_active_red_busy;
                 break;
         }
 

@@ -26,13 +26,12 @@ using Budgie;
 public class StatusDotWindow : Budgie.Popover {
 
     private Gtk.Switch? invisibility_switch = null;
-    private Gtk.ComboBox? status_combobox = null;
-    private Gtk.ListStore? status_store = null;
-    private Gtk.Label? status_label = null;
 
     private Gtk.Stack? stack = null;
     private Gtk.Box? main_view = null;
     private Gtk.Box? settings_view = null;
+
+    private GLib.List<Gtk.ToggleButton> status_toggles = new GLib.List<Gtk.ToggleButton>();
 
     private ulong invisibility_id;
 
@@ -52,6 +51,8 @@ public class StatusDotWindow : Budgie.Popover {
         stack = new Gtk.Stack();
         stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT);
         stack.set_transition_duration(250);
+        stack.set_hhomogeneous(false);
+        stack.set_vhomogeneous(false);
 
         main_view = build_main_view();
         settings_view = build_settings_view();
@@ -88,15 +89,15 @@ public class StatusDotWindow : Budgie.Popover {
     }
 
     private void set_status(StatusEnum status) {
-        status_combobox.set_active_id("%d".printf(status));
+        //status_combobox.set_active_id("%d".printf(status));
     }
 
     private StatusEnum get_status() {
-        string? id = status_combobox.get_active_id();
+        /*string? id = status_combobox.get_active_id();
 
         if (id != null) {
             return (StatusEnum) int.parse(id);
-        }
+        }*/
 
         return StatusEnum.OFFLINE;
     }
@@ -105,9 +106,6 @@ public class StatusDotWindow : Budgie.Popover {
         if (invisibility_switch.get_active() != invisible) {
             invisibility_switch.set_active(invisible);
         }
-
-        status_combobox.set_sensitive(!invisible);
-        status_label.set_sensitive(!invisible);
     }
 
     private Gtk.Button create_icon_button(string icon_name, string? label_text, bool hover_reveal = false) {
@@ -141,69 +139,38 @@ public class StatusDotWindow : Budgie.Popover {
         var box = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
 
         var grid = new Gtk.Grid();
+        grid.set_hexpand(true);
+        grid.set_halign(Gtk.Align.FILL);
         grid.set_row_spacing(6);
         grid.set_column_spacing(12);
+        grid.set_margin_bottom(6);
 
-        var invisibility_label = new Gtk.Label(_("Invisible"));
+        var invisibility_label = new Gtk.Label(_("Invisibility Mode"));
         invisibility_label.set_halign(Gtk.Align.START);
+        invisibility_label.set_hexpand(true);
 
         invisibility_switch = new Gtk.Switch();
         invisibility_switch.set_halign(Gtk.Align.END);
 
-        status_label = new Gtk.Label(_("Current Status"));
-        status_label.set_halign(Gtk.Align.START);
-
-        var status_renderer = new Gtk.CellRendererText();
-        status_store = new Gtk.ListStore(2, typeof(string), typeof(string));
-        status_combobox = new Gtk.ComboBox();
-        status_combobox.set_model(status_store);
-        status_combobox.set_id_column(0);
-        status_combobox.pack_start(status_renderer, true);
-        status_combobox.add_attribute(status_renderer, "text", 1);
-        status_combobox.set_halign(Gtk.Align.END);
-        status_combobox.set_hexpand(true);
-        status_combobox.set_size_request(90, -1);
-
-        Gtk.TreeIter iter;
-        status_store.append(out iter);
-        status_store.set(iter,
-            0, "%d".printf(StatusEnum.OFFLINE),
-            1, "Offline"
-        );
-        status_store.append(out iter);
-        status_store.set(iter,
-            0, "%d".printf(StatusEnum.ONLINE),
-            1, "Online"
-        );
-        status_store.append(out iter);
-        status_store.set(iter,
-            0, "%d".printf(StatusEnum.AWAY),
-            1, "Away"
-        );
-        status_store.append(out iter);
-        status_store.set(iter,
-            0, "%d".printf(StatusEnum.BUSY),
-            1, "Busy"
-        );
-
         grid.attach(invisibility_label, 0, 0);
         grid.attach(invisibility_switch, 1, 0);
-        grid.attach(status_label, 0, 1);
-        grid.attach(status_combobox, 1, 1);
-
         box.pack_start(grid, true, true, 0);
 
-        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        hbox_buttons.set_halign(Gtk.Align.START);
+        var status_toggles_bar = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
+        status_toggles = build_status_toggles(status_toggles_bar);
+
         var button_settings = create_icon_button("emblem-system-symbolic", "Settings");
+
+        var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
+        hbox_buttons.add(status_toggles_bar);
         hbox_buttons.add(button_settings);
         box.pack_end(hbox_buttons, false, false, 0);
 
-        status_combobox.changed.connect(() => {
+        /*status_combobox.changed.connect(() => {
             StatusEnum status = get_status();
 
             settings.set_int("statusdot-state", (int) status);
-        });
+        });*/
 
         invisibility_id = invisibility_switch.notify["active"].connect(() => {
             SignalHandler.block(invisibility_switch, invisibility_id);
@@ -251,7 +218,7 @@ public class StatusDotWindow : Budgie.Popover {
         box.add(grid);
 
         var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
-        hbox_buttons.set_halign(Gtk.Align.START);
+        hbox_buttons.set_halign(Gtk.Align.END);
         var button_back = create_icon_button("go-previous-symbolic", "Back");
         var button_save = create_icon_button("document-save-symbolic", "Save");
         hbox_buttons.add(button_back);
@@ -293,6 +260,67 @@ public class StatusDotWindow : Budgie.Popover {
 
     private void switch_to_settings() {
         stack.set_visible_child_name("settings");
+    }
+
+    private GLib.List<Gtk.ToggleButton> build_status_toggles(Gtk.Box status_toggles_bar) {
+        string[] tooltips = {
+            "Online",
+            "Away",
+            "Offline",
+            "Busy"
+        };
+
+        string[] icon_names = {
+            "statusdot-active-green",
+            "statusdot-active-orange",
+            "statusdot-active-red",
+            "statusdot-active-red-busy",
+        };
+
+        foreach (var child in status_toggles_bar.get_children()) {
+            status_toggles_bar.remove(child);
+        }
+
+        var first_toggle_button = (Gtk.ToggleButton?) null;
+        var toggle_buttons = new GLib.List<Gtk.ToggleButton>();
+
+        for (int i = 0; i < tooltips.length; i++) {
+            var button_icon = new Gtk.Image.from_icon_name(icon_names[i], Gtk.IconSize.BUTTON);
+            var button = new Gtk.ToggleButton();
+            button.add(button_icon);
+            button.set_tooltip_text(tooltips[i]);
+            button.set_hexpand(true);
+
+            button.toggled.connect(() => {
+                //update_notebook_visibility(button);
+            });
+
+            toggle_buttons.append(button);
+            status_toggles_bar.pack_start(button, true, true, 0);
+
+            if (first_toggle_button == null) {
+                first_toggle_button = button;
+            }
+        }
+
+        if (first_toggle_button != null) {
+            first_toggle_button.set_active(true);
+        }
+
+        return toggle_buttons;
+    }
+
+    private int get_status_toggles_index(Gtk.ToggleButton button) {
+        int index = 0;
+
+        for (unowned GLib.List<Gtk.ToggleButton>? l = status_toggles; l != null; l = l.next) {
+            if (l.data == button) {
+                return index;
+            }
+            index++;
+        }
+
+        return -1;
     }
 
     /*
