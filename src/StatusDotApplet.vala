@@ -50,10 +50,10 @@ public class StatusDotApplet : Budgie.Applet {
         settings = new GLib.Settings("io.grnbk.statusdotapplet");
 
         statusdot_invisible = "statusdot-invisible";
-        statusdot_online = "statusdot-active-online";
-        statusdot_away = "statusdot-active-away";
-        statusdot_offline = "statusdot-active-offline";
-        statusdot_busy = "statusdot-active-busy";
+        statusdot_online = "statusdot-online";
+        statusdot_away = "statusdot-away";
+        statusdot_offline = "statusdot-offline";
+        statusdot_busy = "statusdot-busy";
 
         event_box = new Gtk.EventBox();
         applet_icon = new Gtk.Image.from_icon_name(get_current_mode_icon(), Gtk.IconSize.MENU);
@@ -92,9 +92,8 @@ public class StatusDotApplet : Budgie.Applet {
             return statusdot_invisible;
         }
 
-        int value = settings.get_int("statusdot-state");
-        StatusEnum status = (StatusEnum) value;
-        var state_icon = statusdot_active_red;
+        StatusEnum status = (StatusEnum) settings.get_int("statusdot-state");
+        var state_icon = statusdot_offline;
 
         switch (status) {
             case StatusEnum.OFFLINE:
