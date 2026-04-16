@@ -159,7 +159,43 @@ public class StatusDotAPI : GLib.Object {
         }
     }
 
-    // TODO method to get /status/device
+    public async bool set_device_status(string device, StatusUpdate update) throws GLib.Error {
+        if (!is_connection_valid) {
+            return false;
+        }
 
-    // TODO method to set /status/device
+        string endpoint = "/api/status/%s".printf(device);
+
+        string json_body = "{ \"status\": %d, \"expiration_ttl\": %d }".printf(
+            (int) update.status,
+            update.expiration_ttl
+        );
+
+        string response = yield request("POST", endpoint, json_body);
+
+        if (response == null || response.length == 0) {
+            warning("Empty response from POST " + endpoint);
+            return false;
+        }
+
+        var parser = new Json.Parser();
+
+        try {
+            parser.load_from_data(response, -1);
+            var root = parser.get_root();
+
+            if (root == null || root.get_node_type() != Json.NodeType.OBJECT) {
+                warning("Invalid JSON structure from POST " + endpoint);
+                return false;
+            }
+
+            var obj = root.get_object();
+
+            return obj.has_member("success") && obj.get_boolean_member("success");
+
+        } catch (GLib.Error e) {
+            warning("Failed to parse JSON from POST " + endpoint + ": %s".printf(e.message));
+            return false;
+        }
+    }
 }
