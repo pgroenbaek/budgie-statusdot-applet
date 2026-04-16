@@ -26,12 +26,24 @@ public enum StatusEnum {
     BUSY = 3,
 }
 
-public class Status : GLib.Object {
+public class StatusUpdate : GLib.Object {
     public StatusEnum status { get; set; }
-    public int expirationTtl { get; set; }
+    public int expiration_ttl { get; set; }
 
-    public Status(StatusEnum status, int expirationTtl) {
+    public StatusUpdate(StatusEnum status, int expiration_ttl = 420) {
         this.status = status;
-        this.expirationTtl = expirationTtl;
+        this.expiration_ttl = expiration_ttl;
     }
 }
+
+public class DeviceStatus : GLib.Object {
+    public StatusEnum status { get; set; }
+    public int updated_at { get; set; }
+
+    public DeviceStatus(StatusEnum status, int updated_at) {
+        this.status = status;
+        this.updated_at = updated_at;
+    }
+}
+
+

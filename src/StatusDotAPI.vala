@@ -99,7 +99,7 @@ public class StatusDotAPI : GLib.Object {
         var loop = new GLib.MainLoop();
         this.session.queue_message(message, (session, message) => {
             if (message.status_code != Soup.Status.OK &&
-                message.status_code != Soup.Status.CREATED) 
+                message.status_code != Soup.Status.CREATED)
             {
                 loop.quit();
                 throw new GLib.Error(
@@ -116,4 +116,50 @@ public class StatusDotAPI : GLib.Object {
         loop.run();
         return response;
     }
+
+    private async DeviceStatus parse_device_status_object(Json.Object obj) throws GLib.Error {
+        return new DeviceStatus(
+            (StatusEnum) obj.get_int_member("status"),
+            (int) obj.get_int_member("updated_at")
+        );
+    }
+
+    public async DeviceStatus? get_device_status(string device) throws GLib.Error {
+        if (!is_connection_valid) {
+            return null;
+        }
+
+        string endpoint = "/api/status/%s".printf(device);
+
+        string response = yield request("GET", endpoint);
+
+        if (response == null || response.length == 0) {
+            warning("Empty response from " + endpoint);
+            return null;
+        }
+
+        var parser = new Json.Parser();
+
+        try {
+            parser.load_from_data(response, -1);
+            var root = parser.get_root();
+
+            if (root == null || root.get_node_type() != Json.NodeType.OBJECT) {
+                warning("Invalid JSON structure from " + endpoint);
+                return null;
+            }
+
+            var obj = root.get_object();
+
+            return yield parse_device_status_object(obj);
+
+        } catch (GLib.Error e) {
+            warning("Failed to parse JSON from " + endpoint + ": %s".printf(e.message));
+            return null;
+        }
+    }
+
+    // TODO method to get /status/device
+
+    // TODO method to set /status/device
 }
