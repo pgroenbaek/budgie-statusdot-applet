@@ -16,46 +16,49 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
+
 using GLib;
 
 public class StatusDotManager : GLib.Object {
+
     private StatusDotAPI api;
 
     public signal void disconnected();
     public signal void connected();
     public signal void updated();
+    public signal void warning(string message);
 
-    public StatusEnum status { get; private set; }
-    public int updated_at { get; private set; }
-
-    private string device_id;
+    private string device_name = "test";
     private uint refresh_interval_ms = 5 * 60 * 1000; // 5 minutes in milliseconds
     private bool was_connected = true;
+    private int last_updated_at;
 
-    public StatusDotManager(StatusDotAPI api, string device_id) {
+    private unowned GLib.Settings? settings;
+
+    public StatusDotManager(StatusDotAPI api, GLib.Settings? settings) {
         this.api = api;
-        this.device_id = device_id;
+        this.settings = settings;
 
-        refresh_from_server();
+        refresh_from_api();
 
         Timeout.add(refresh_interval_ms, () => {
-            refresh_from_server();
+            refresh_from_api();
             return true;
         });
     }
 
     public void set_api(StatusDotAPI api) {
         this.api = api;
-        refresh_from_server();
+        refresh_from_api();
     }
 
-    public void refresh_from_server() {
-        api.get_device_status.begin(device_id, (obj, res) => {
+    public void refresh_from_api() {
+        api.get_device_status.begin(device_name, (obj, res) => {
             try {
                 var result = api.get_device_status.end(res);
 
-                status = result.status;
-                updated_at = result.updated_at;
+                //status = result.status;
+                last_updated_at = result.updated_at;
 
                 updated();
 
@@ -64,7 +67,7 @@ public class StatusDotManager : GLib.Object {
                     was_connected = true;
                 }
             } catch (Error e) {
-                warning("Failed to refresh status: %s", e.message);
+                //warning("Failed to refresh status: %s", e.message);
 
                 if (was_connected) {
                     disconnected();
@@ -74,29 +77,63 @@ public class StatusDotManager : GLib.Object {
         });
     }
 
-    public void set_status(StatusEnum new_status, int ttl_seconds = 420) {
+    public void set_current_status(StatusEnum new_status, int ttl_seconds = 420) {
         var update = new StatusUpdate(new_status, ttl_seconds);
 
-        api.set_device_status.begin(device_id, update, (obj, res) => {
+        api.set_device_status.begin(device_name, update, (obj, res) => {
             try {
                 api.set_device_status.end(res);
 
-                status = new_status;
-                updated_at = (int) new DateTime.now_utc().to_unix();
+                //status = new_status;
+                last_updated_at = (int) new DateTime.now_utc().to_unix();
 
                 updated();
 
             } catch (Error e) {
-                warning("Failed to set status: %s", e.message);
+                //warning("Failed to set status: %s", e.message);
             }
         });
     }
-
-    public bool is_online() {
-        return status == StatusEnum.ONLINE;
+    
+    public void set_base_url(string base_url) {
+        settings?.set_string("statusdot-api-baseurl", base_url);
     }
 
-    public bool is_away() {
-        return status == StatusEnum.AWAY;
+    public void set_device_name(string device_name) {
+        this.device_name = device_name;
+        settings?.set_string("device-name", device_name);
     }
+
+    public void set_invisibility_mode(bool invisible) {
+        settings?.set_boolean("statusdot-invisible", invisible);
+    }
+
+    public void set_workhours_start(int workhours_start) {
+        settings?.set_int("working-hours-start", workhours_start);
+    }
+
+    public void set_workhours_end(int workhours_end) {
+        settings?.set_int("working-hours-end", workhours_end);
+    }
+
+    public void set_invisible_outside_hours(bool invisible_outside_hours) {
+        settings?.set_boolean("invisible-outside-hours", invisible_outside_hours);
+    }
+
+    public void set_show_away_as_offline(bool show_away_as_offline) {
+        settings?.set_boolean("show-away-as-offline", show_away_as_offline);
+    }
+
+    public void set_show_busy_as_offline(bool show_busy_as_offline) {
+        settings?.set_boolean("show-busy-as-offline", show_busy_as_offline);
+    }
+
+    public void set_away_after_idle(int away_after_idle) {
+        settings?.set_int("away-after-idle", away_after_idle);
+    }
+
+    public void set_offline_after_idle(int offline_after_idle) {
+        settings?.set_int("offline-after-idle", offline_after_idle);
+    }
+
 }

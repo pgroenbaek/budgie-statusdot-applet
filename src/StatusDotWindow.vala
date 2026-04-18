@@ -31,12 +31,14 @@ public class StatusDotWindow : Budgie.Popover {
     private Gtk.Box? main_view = null;
     private Gtk.Box? settings_view = null;
 
-    private Gtk.Label warning_label;
-    private Gtk.Box warning_box;
+    private Gtk.Label? warning_label = null;
+    private Gtk.Box? warning_box = null;
 
-    private GLib.List<Gtk.ToggleButton> status_toggles = new GLib.List<Gtk.ToggleButton>();
+    private GLib.HashTable<StatusEnum, Gtk.ToggleButton> status_toggles =
+        new GLib.HashTable<StatusEnum, Gtk.ToggleButton>(GLib.direct_hash, GLib.direct_equal);
 
-    private ulong invisibility_id;
+    private StatusDotAPI api;
+    private StatusDotManager status_manager;
 
     private Secret.Schema api_key_schema;
 
@@ -54,6 +56,9 @@ public class StatusDotWindow : Budgie.Popover {
             Secret.SchemaAttributeType.STRING
         );
 
+        string base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        string api_key = lookup_api_key() ?? "";
+
         var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         container.get_style_context().add_class("container");
 
@@ -62,6 +67,21 @@ public class StatusDotWindow : Budgie.Popover {
         */
         warning_box = build_warning_box();
         container.pack_start(warning_box, false, false, 0);
+
+        /*
+        API connection and status manager.
+        */
+        api = new StatusDotAPI(base_url, api_key);
+        status_manager = new StatusDotManager(api, c_settings);
+/*
+        try {
+            api.validate_connection("laptop");
+            hide_warning();
+            settings.set_boolean("warning-persistent", false);
+        } catch (GLib.Error e) {
+            show_warning("%s".printf(e.message));
+            settings.set_boolean("warning-persistent", true);
+        }*/
 
         /*
         Stack with main and settings ui.
@@ -84,8 +104,7 @@ public class StatusDotWindow : Budgie.Popover {
         /*
         Initial state.
         */
-        set_status(StatusEnum.OFFLINE);
-        set_invisibility(true);
+        //set_invisibility(true);
 
         /*
         Events wiring.
@@ -94,14 +113,27 @@ public class StatusDotWindow : Budgie.Popover {
             int value = settings.get_int("statusdot-state");
             StatusEnum status = (StatusEnum) value;
 
-            set_status(status);
+            //status_manager.set_current_status(status);
         });
 
         settings.changed["statusdot-invisible"].connect(() => {
             bool invisible = settings.get_boolean("statusdot-invisible");
 
-            set_invisibility(invisible);
+            //set_invisibility(invisible);
         });
+
+        status_manager.connected.connect(() => {
+            hide_warning();
+            settings.set_boolean("warning-persistent", false);
+        });
+        status_manager.disconnected.connect(() => {
+            show_warning("No internet connection");
+            settings.set_boolean("warning-persistent", true);
+        });
+        status_manager.updated.connect(() => {
+            update_controls();
+        });
+        status_manager.refresh_from_api();
         
         this.show.connect(() => {
             var warning_persistent = settings.get_boolean("warning-persistent");
@@ -111,17 +143,20 @@ public class StatusDotWindow : Budgie.Popover {
                 hide_warning();
             }
         });
-        this.show_all();
+        //this.show_all();
     }
 
-    private void set_status(StatusEnum status) {
+    private void update_controls() {
+        /*StatusEnum status = status_manager.status;
+        bool invisible = status_manager.invisible;
         
-    }
+        status_toggles.foreach((key, value) => {
+            value.set_active(key == status);
+        });
 
-    private void set_invisibility(bool invisible) {
         if (invisibility_switch.get_active() != invisible) {
             invisibility_switch.set_active(invisible);
-        }
+        }*/
     }
 
     private Gtk.Button create_icon_button(string icon_name, string? label_text, bool hover_reveal = false) {
@@ -168,29 +203,28 @@ public class StatusDotWindow : Budgie.Popover {
         invisibility_switch = new Gtk.Switch();
         invisibility_switch.set_halign(Gtk.Align.END);
 
+        bool current_statusdot_invisible = settings?.get_boolean("statusdot-invisible") ?? true;
+        invisibility_switch.set_active(current_statusdot_invisible);
+
+        invisibility_switch.notify["active"].connect(() => {
+            status_manager.set_invisibility_mode(invisibility_switch.get_active());
+        });
+
         grid.attach(invisibility_label, 0, 0);
         grid.attach(invisibility_switch, 1, 0);
         box.pack_start(grid, true, true, 0);
 
         var status_toggles_bar = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 0);
-        status_toggles = build_status_toggles(status_toggles_bar);
+        build_status_toggles(status_toggles_bar);
 
         var button_settings = create_icon_button("emblem-system-symbolic", "Settings");
+
+        button_settings.clicked.connect(() => switch_to_settings());
 
         var hbox_buttons = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
         hbox_buttons.add(status_toggles_bar);
         hbox_buttons.add(button_settings);
         box.pack_end(hbox_buttons, false, false, 0);
-
-        invisibility_id = invisibility_switch.notify["active"].connect(() => {
-            SignalHandler.block(invisibility_switch, invisibility_id);
-            bool invisible = invisibility_switch.get_active();
-            settings.set_boolean("statusdot-invisible", invisible);
-            set_invisibility(invisible);
-            SignalHandler.unblock(invisibility_switch, invisibility_id);
-        });
-
-        button_settings.clicked.connect(() => switch_to_settings());
 
         return box;
     }
@@ -202,29 +236,50 @@ public class StatusDotWindow : Budgie.Popover {
         grid.set_row_spacing(6);
         grid.set_column_spacing(6);
 
+        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        string current_api_key = lookup_api_key() ?? "";
+        string current_devicename = settings?.get_string("device-name") ?? "";
+        int current_work_start = settings?.get_int("working-hours-start") ?? 540;
+        int current_work_end = settings?.get_int("working-hours-end") ?? 1020;
+        bool current_invisible_outside = settings?.get_boolean("invisible-outside-hours") ?? true;
+        bool current_away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
+        bool current_busy_as_offline = settings?.get_boolean("show-busy-as-offline") ?? false;
+        int current_away_after_idle = settings?.get_int("away-after-idle") ?? 5;
+        int current_offline_after_idle = settings?.get_int("offline-after-idle") ?? 15;
+
         var label_baseurl_title = new Gtk.Label("Base URL:");
         label_baseurl_title.set_halign(Gtk.Align.END);
-        var label_apikey_title = new Gtk.Label("API Key:");
-        label_apikey_title.set_halign(Gtk.Align.END);
-
-        string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
-        //string current_api_token = lookup_api_token() ?? "";
 
         var entry_baseurl = new Gtk.Entry();
         entry_baseurl.set_hexpand(true);
         entry_baseurl.set_halign(Gtk.Align.FILL);
         entry_baseurl.set_text(current_base_url);
 
+        grid.attach(label_baseurl_title, 0, 0, 1, 1);
+        grid.attach(entry_baseurl, 1, 0, 1, 1);
+
+        var label_apikey_title = new Gtk.Label("API Key:");
+        label_apikey_title.set_halign(Gtk.Align.END);
+
         var entry_apikey = new Gtk.Entry();
         entry_apikey.set_hexpand(true);
         entry_apikey.set_halign(Gtk.Align.FILL);
-        //entry_apikey.set_text(current_api_token);
+        entry_apikey.set_text(current_api_key);
         entry_apikey.visibility = false;
 
-        grid.attach(label_baseurl_title, 0, 0, 1, 1);
-        grid.attach(entry_baseurl, 1, 0, 1, 1);
         grid.attach(label_apikey_title, 0, 1, 1, 1);
         grid.attach(entry_apikey, 1, 1, 1, 1);
+
+        var label_devicename_title = new Gtk.Label("Device Name:");
+        label_devicename_title.set_halign(Gtk.Align.END);
+
+        var entry_devicename = new Gtk.Entry();
+        entry_devicename.set_hexpand(true);
+        entry_devicename.set_halign(Gtk.Align.FILL);
+        entry_devicename.set_text(current_devicename);
+
+        grid.attach(label_devicename_title, 0, 2, 1, 1);
+        grid.attach(entry_devicename, 1, 2, 1, 1);
 
         var label_work_start = new Gtk.Label("Working hours start:");
         label_work_start.set_halign(Gtk.Align.END);
@@ -232,6 +287,7 @@ public class StatusDotWindow : Budgie.Popover {
         var time_work_start_adj = new Gtk.Adjustment(0, 0, 24 * 60 - 1, 30, 60, 0);
         var time_work_start = new Gtk.SpinButton(time_work_start_adj, 30, 0);
         time_work_start.set_hexpand(true);
+        time_work_start.set_value(current_work_start);
 
         time_work_start.output.connect((entry) => {
             int v = entry.get_value_as_int();
@@ -240,16 +296,16 @@ public class StatusDotWindow : Budgie.Popover {
         });
 
         time_work_start.input.connect((entry, out new_value) => {
-            string[] p = entry.get_text().split(":");
-            if (p.length == 2) {
-                new_value = int.parse(p[0]) * 60 + int.parse(p[1]);
+            string[] parts = entry.get_text().split(":");
+            if (parts.length == 2) {
+                new_value = int.parse(parts[0]) * 60 + int.parse(parts[1]);
                 return 1;
             }
             return 0;
         });
 
-        grid.attach(label_work_start, 0, 2, 1, 1);
-        grid.attach(time_work_start, 1, 2, 1, 1);
+        grid.attach(label_work_start, 0, 3, 1, 1);
+        grid.attach(time_work_start, 1, 3, 1, 1);
 
         var label_work_end = new Gtk.Label("Working hours end:");
         label_work_end.set_halign(Gtk.Align.END);
@@ -257,6 +313,7 @@ public class StatusDotWindow : Budgie.Popover {
         var time_work_end_adj = new Gtk.Adjustment(0, 0, 24 * 60 - 1, 30, 60, 0);
         var time_work_end = new Gtk.SpinButton(time_work_end_adj, 30, 0);
         time_work_end.set_hexpand(true);
+        time_work_end.set_value(current_work_end);
 
         time_work_end.output.connect((entry) => {
             int v = entry.get_value_as_int();
@@ -265,50 +322,64 @@ public class StatusDotWindow : Budgie.Popover {
         });
 
         time_work_end.input.connect((entry, out new_value) => {
-            string[] p = entry.get_text().split(":");
-            if (p.length == 2) {
-                new_value = int.parse(p[0]) * 60 + int.parse(p[1]);
+            string[] parts = entry.get_text().split(":");
+            if (parts.length == 2) {
+                new_value = int.parse(parts[0]) * 60 + int.parse(parts[1]);
                 return 1;
             }
             return 0;
         });
 
-        grid.attach(label_work_end, 0, 3, 1, 1);
-        grid.attach(time_work_end, 1, 3, 1, 1);
+        grid.attach(label_work_end, 0, 4, 1, 1);
+        grid.attach(time_work_end, 1, 4, 1, 1);
 
-        var label_never_online = new Gtk.Label("Invisible outside hours:");
-        label_never_online.set_halign(Gtk.Align.END);
+        var label_invisible_outside = new Gtk.Label("Invisible outside hours:");
+        label_invisible_outside.set_halign(Gtk.Align.END);
 
-        var switch_never_online = new Gtk.Switch();
-        switch_never_online.set_halign(Gtk.Align.START);
+        var switch_invisible_outside = new Gtk.Switch();
+        switch_invisible_outside.set_halign(Gtk.Align.START);
+        switch_invisible_outside.set_active(current_invisible_outside);
 
-        grid.attach(label_never_online, 0, 4, 1, 1);
-        grid.attach(switch_never_online, 1, 4, 1, 1);
+        grid.attach(label_invisible_outside, 0, 5, 1, 1);
+        grid.attach(switch_invisible_outside, 1, 5, 1, 1);
 
         var label_away_as_offline = new Gtk.Label("Show away as offline:");
         label_away_as_offline.set_halign(Gtk.Align.END);
 
         var switch_away_as_offline = new Gtk.Switch();
         switch_away_as_offline.set_halign(Gtk.Align.START);
+        switch_away_as_offline.set_active(current_away_as_offline);
 
-        grid.attach(label_away_as_offline, 0, 5, 1, 1);
-        grid.attach(switch_away_as_offline, 1, 5, 1, 1);
+        grid.attach(label_away_as_offline, 0, 6, 1, 1);
+        grid.attach(switch_away_as_offline, 1, 6, 1, 1);
 
-        var label_idle_minutes = new Gtk.Label("Away after idle (min):");
-        label_idle_minutes.set_halign(Gtk.Align.END);
-        var spin_idle_minutes = new Gtk.SpinButton.with_range(1, 240, 1);
-        spin_idle_minutes.set_hexpand(true);
+        var label_busy_as_offline = new Gtk.Label("Show busy as offline:");
+        label_busy_as_offline.set_halign(Gtk.Align.END);
 
-        grid.attach(label_idle_minutes, 0, 6, 1, 1);
-        grid.attach(spin_idle_minutes, 1, 6, 1, 1);
+        var switch_busy_as_offline = new Gtk.Switch();
+        switch_busy_as_offline.set_halign(Gtk.Align.START);
+        switch_busy_as_offline.set_active(current_busy_as_offline);
 
-        var label_away_duration = new Gtk.Label("Offline after idle (min):");
-        label_away_duration.set_halign(Gtk.Align.END);
-        var spin_away_duration = new Gtk.SpinButton.with_range(1, 480, 1);
-        spin_away_duration.set_hexpand(true);
+        grid.attach(label_busy_as_offline, 0, 7, 1, 1);
+        grid.attach(switch_busy_as_offline, 1, 7, 1, 1);
 
-        grid.attach(label_away_duration, 0, 7, 1, 1);
-        grid.attach(spin_away_duration, 1, 7, 1, 1);
+        var label_away_after_idle = new Gtk.Label("Away after idle (min):");
+        label_away_after_idle.set_halign(Gtk.Align.END);
+        var spin_away_after_idle = new Gtk.SpinButton.with_range(1, 240, 1);
+        spin_away_after_idle.set_hexpand(true);
+        spin_away_after_idle.set_value(current_away_after_idle);
+
+        grid.attach(label_away_after_idle, 0, 8, 1, 1);
+        grid.attach(spin_away_after_idle, 1, 8, 1, 1);
+
+        var label_offline_after_idle = new Gtk.Label("Offline after idle (min):");
+        label_offline_after_idle.set_halign(Gtk.Align.END);
+        var spin_offline_after_idle = new Gtk.SpinButton.with_range(1, 480, 1);
+        spin_offline_after_idle.set_hexpand(true);
+        spin_offline_after_idle.set_value(current_offline_after_idle);
+
+        grid.attach(label_offline_after_idle, 0, 9, 1, 1);
+        grid.attach(spin_offline_after_idle, 1, 9, 1, 1);
 
         box.add(grid);
 
@@ -322,26 +393,36 @@ public class StatusDotWindow : Budgie.Popover {
 
         button_back.clicked.connect(() => switch_to_main());
         button_save.clicked.connect(() => {
-            /*string new_base_url = entry_baseurl.get_text() ?? "";
-            string new_api_token = entry_apitoken.get_text() ?? "";
+            string new_base_url = entry_baseurl.get_text() ?? "";
+            string new_api_key = entry_apikey.get_text() ?? "";
+            string new_device_name = entry_devicename.get_text() ?? "";
 
-            settings?.set_string("kimai-api-baseurl", new_base_url);
-            store_api_token(new_api_token);
+            settings?.set_string("statusdot-api-baseurl", new_base_url);
+            store_api_key(new_api_key);
 
-            api = new KimaiAPI(new_base_url, new_api_token);
+            status_manager.set_base_url(new_base_url);
+            status_manager.set_device_name(new_device_name);
+            status_manager.set_workhours_start(time_work_start.get_value_as_int());
+            status_manager.set_workhours_end(time_work_end.get_value_as_int());
+            status_manager.set_invisible_outside_hours(switch_invisible_outside.get_active());
+            status_manager.set_show_away_as_offline(switch_away_as_offline.get_active());
+            status_manager.set_show_busy_as_offline(switch_busy_as_offline.get_active());
+            status_manager.set_away_after_idle(spin_away_after_idle.get_value_as_int());
+            status_manager.set_offline_after_idle(spin_offline_after_idle.get_value_as_int());
+
+            api = new StatusDotAPI(new_base_url, new_api_key);
 
             try {
-                api.validate_connection();
+                api.validate_connection("laptop");
                 hide_warning();
-                refresh_combobox_data();
                 settings.set_boolean("warning-persistent", false);
             } catch (GLib.Error e) {
                 show_warning("%s".printf(e.message));
                 settings.set_boolean("warning-persistent", true);
             }
 
-            timer_manager.set_api(api);
-            timer_manager.refresh_from_server();*/
+            status_manager.set_api(api);
+            status_manager.refresh_from_api();
 
             switch_to_main();
         });
@@ -357,7 +438,7 @@ public class StatusDotWindow : Budgie.Popover {
         stack.set_visible_child_name("settings");
     }
 
-    private GLib.List<Gtk.ToggleButton> build_status_toggles(Gtk.Box status_toggles_bar) {
+    private void build_status_toggles(Gtk.Box status_toggles_bar) {
         StatusEnum[] button_values = {
             StatusEnum.ONLINE,
             StatusEnum.AWAY,
@@ -384,10 +465,10 @@ public class StatusDotWindow : Budgie.Popover {
         }
 
         var first_toggle_button = (Gtk.ToggleButton?) null;
-        var toggle_buttons = new GLib.List<Gtk.ToggleButton>();
 
         for (int i = 0; i < button_values.length; i++) {
             var status = button_values[i];
+
             var button_icon = new Gtk.Image.from_icon_name(icon_names[i], Gtk.IconSize.BUTTON);
             var button = new Gtk.ToggleButton();
             button.add(button_icon);
@@ -400,7 +481,7 @@ public class StatusDotWindow : Budgie.Popover {
                     return true;
                 }
 
-                foreach (var other in status_toggles) {
+                foreach (var other in status_toggles.get_values()) {
                     if (other != button) {
                         other.set_active(false);
                     }
@@ -412,7 +493,7 @@ public class StatusDotWindow : Budgie.Popover {
                 return true;
             });
 
-            toggle_buttons.append(button);
+            status_toggles.insert(status, button);
             status_toggles_bar.pack_start(button, true, true, 0);
 
             if (first_toggle_button == null) {
@@ -423,8 +504,6 @@ public class StatusDotWindow : Budgie.Popover {
         if (first_toggle_button != null) {
             first_toggle_button.set_active(true);
         }
-
-        return toggle_buttons;
     }
 
     private Gtk.Box build_warning_box() {

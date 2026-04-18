@@ -22,6 +22,7 @@ using Json;
 using GLib;
 
 public class StatusDotAPI : GLib.Object {
+
     private Soup.Session session;
     private string base_url;
     private string api_key;
@@ -39,7 +40,7 @@ public class StatusDotAPI : GLib.Object {
         this.api_key = api_key;
     }
 
-    public void validate_connection() throws GLib.Error {
+    public void validate_connection(string device_name) throws GLib.Error {
         try {
             GLib.Uri.parse(base_url, GLib.UriFlags.NONE);
         } catch (GLib.Error e) {
@@ -57,7 +58,7 @@ public class StatusDotAPI : GLib.Object {
             throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
         }
 
-        var message = new Soup.Message("GET", base_url + "/customers");
+        var message = new Soup.Message("GET", base_url + "/status/" + device_name);
         message.request_headers.append("x-api-key", this.api_key);
         this.session.send_message(message);
 
@@ -129,7 +130,7 @@ public class StatusDotAPI : GLib.Object {
             return null;
         }
 
-        string endpoint = "/api/status/%s".printf(device);
+        string endpoint = "/status/%s".printf(device);
 
         string response = yield request("GET", endpoint);
 
@@ -164,7 +165,7 @@ public class StatusDotAPI : GLib.Object {
             return false;
         }
 
-        string endpoint = "/api/status/%s".printf(device);
+        string endpoint = "/status/%s".printf(device);
 
         string json_body = "{ \"status\": %d, \"expiration_ttl\": %d }".printf(
             (int) update.status,

@@ -13,7 +13,47 @@
     <key name="statusdot-api-baseurl" type="s">
       <default>''</default>
       <summary>Statusdot API base URL</summary>
-      <description>The base URL of the Statusdot server API (e.g. https://statusdot.example.com/api/).</description>
+      <description>The base URL of the Statusdot API (e.g. https://statusdot.example.com/api/).</description>
+    </key>
+    <key name="device-name" type="s">
+      <default>''</default>
+      <summary>Device name</summary>
+      <description>The device name used with the Statusdot API.</description>
+    </key>
+    <key name="working-hours-start" type="i">
+      <default>540</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="working-hours-end" type="i">
+      <default>1020</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="invisible-outside-hours" type="b">
+      <default>true</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="show-away-as-offline" type="b">
+      <default>false</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="show-busy-as-offline" type="b">
+      <default>false</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="away-after-idle" type="i">
+      <default>5</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
+    </key>
+    <key name="offline-after-idle" type="i">
+      <default>15</default>
+      <summary>REPLACEME</summary>
+      <description>REPLACEME</description>
     </key>
     <key name="warning-persistent" type="b">
       <default>false</default>
