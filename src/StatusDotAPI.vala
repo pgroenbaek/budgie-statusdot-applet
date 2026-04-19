@@ -28,10 +28,10 @@ public class StatusDotAPI : GLib.Object {
     private string api_key;
     private bool connection_valid = false;
 
-    private delegate void RequestCallback(Soup.Session session, Soup.Message msg);
+    private delegate void ResponseHandler(Soup.Session session, Soup.Message msg);
 
-    public delegate void StatusCallback(bool success, DeviceStatus? status, string? error_message);
-    public delegate void ValidationCallback(bool valid, string? error_message);
+    public delegate void ValidationResult(bool success, string? error_message);
+    public delegate void Result<T>(bool success, T? item, string? error_message);
 
     public StatusDotAPI(string base_url, string api_key) {
         if (base_url.has_suffix("/")) {
@@ -45,7 +45,7 @@ public class StatusDotAPI : GLib.Object {
         this.api_key = api_key;
     }
 
-    private void request(string method, string endpoint, string? body, owned RequestCallback callback) {
+    private void request(string method, string endpoint, string? body, owned ResponseHandler handler) {
         var request_message = new Soup.Message(method, base_url + endpoint);
         request_message.request_headers.append("x-api-key", api_key);
 
@@ -59,7 +59,7 @@ public class StatusDotAPI : GLib.Object {
         }
 
         session.queue_message(request_message, (session, response_message) => {
-            callback(session, response_message);
+            handler(session, response_message);
         });
     }
 
@@ -68,16 +68,16 @@ public class StatusDotAPI : GLib.Object {
         return (string) buffer.data;
     }
 
-    public void validate_connection(string device_name, owned ValidationCallback callback) {
+    public void validate_connection(string device_name, owned ValidationResult result) {
         if (base_url == "") {
             connection_valid = false;
-            callback(false, "Base URL not set.");
+            result(false, "Base URL not set.");
             return;
         }
 
         if (api_key == "") {
             connection_valid = false;
-            callback(false, "API key not set.");
+            result(false, "API key not set.");
             return;
         }
 
@@ -85,19 +85,19 @@ public class StatusDotAPI : GLib.Object {
             GLib.Uri.parse(base_url, GLib.UriFlags.NONE);
         } catch (GLib.Error e) {
             connection_valid = false;
-            callback(false, "Invalid base URL: Not an URL.");
+            result(false, "Invalid base URL: Not an URL.");
             return;
         }
 
         if (!base_url.has_prefix("https://")) {
             connection_valid = false;
-            callback(false, "Invalid base URL: Must start with 'https://'.");
+            result(false, "Invalid base URL: Must start with 'https://'.");
             return;
         }
 
         if (!base_url.has_suffix("/api")) {
             connection_valid = false;
-            callback(false, "Invalid base URL: Must end with '/api'.");
+            result(false, "Invalid base URL: Must end with '/api'.");
             return;
         }
 
@@ -108,24 +108,24 @@ public class StatusDotAPI : GLib.Object {
                 message.status_code == Soup.Status.IO_ERROR)
             {
                 connection_valid = false;
-                callback(false, "Network error: Cannot reach server.");
+                result(false, "Network error: Cannot reach server.");
                 return;
             }
 
             if (message.status_code == Soup.Status.UNAUTHORIZED) {
                 connection_valid = false;
-                callback(false, "Invalid API key.");
+                result(false, "Invalid API key.");
                 return;
             }
 
             if (message.status_code == Soup.Status.OK) {
                 connection_valid = true;
-                callback(true, null);
+                result(true, null);
                 return;
             }
 
             connection_valid = false;
-            callback(false, "API validation failed: %d %s".printf(
+            result(false, "API validation failed: %d %s".printf(
                 (int) message.status_code,
                 message.reason_phrase
             ));
@@ -136,7 +136,7 @@ public class StatusDotAPI : GLib.Object {
         return connection_valid;
     }
 
-    public void get_device_status(string device, owned StatusCallback callback) {
+    public void get_device_status(string device, owned Result<DeviceStatus> result) {
         request("GET", "/status/" + device, null, (session, message) => {
 
             if (message.status_code == Soup.Status.CANT_RESOLVE ||
@@ -145,7 +145,7 @@ public class StatusDotAPI : GLib.Object {
                 message.status_code == Soup.Status.IO_ERROR)
             {
                 connection_valid = false;
-                callback(false, null, "Network error: Cannot reach server.");
+                result(false, (DeviceStatus?) null, "Network error: Cannot reach server.");
                 return;
             }
 
@@ -154,8 +154,6 @@ public class StatusDotAPI : GLib.Object {
                     var parser = new Json.Parser();
 
                     string json = get_json(message);
-
-                    GLib.message(json);
 
                     parser.load_from_data(json, -1);
 
@@ -166,20 +164,20 @@ public class StatusDotAPI : GLib.Object {
                         obj.get_int_member("updated_at")
                     );
 
-                    callback(true, status, null);
+                    result(true, status, null);
                     return;
 
                 } catch (Error e) {
-                    callback(false, null, e.message);
+                    result(false, (DeviceStatus?) null, e.message);
                     return;
                 }
             }
 
-            callback(false, null, null);
+            result(false, (DeviceStatus?) null, null);
         });
     }
 
-    public void set_device_status(string device, StatusUpdate update, owned StatusCallback callback) {
+    public void set_device_status(string device, StatusUpdate update, owned Result<DeviceStatus> result) {
 
         string json_body = "{ \"status\": %d, \"expiration_ttl\": %d }".printf(
             (int) update.status,
@@ -194,7 +192,7 @@ public class StatusDotAPI : GLib.Object {
                 message.status_code == Soup.Status.IO_ERROR)
             {
                 connection_valid = false;
-                callback(false, null, "Network error: Cannot reach server.");
+                result(false, (DeviceStatus?) null, "Network error: Cannot reach server.");
                 return;
             }
 
@@ -215,16 +213,16 @@ public class StatusDotAPI : GLib.Object {
                         obj.get_int_member("updated_at")
                     );
 
-                    callback(true, status, null);
+                    result(true, status, null);
                     return;
 
                 } catch (Error e) {
-                    callback(false, null, e.message);
+                    result(false, (DeviceStatus?) null, e.message);
                     return;
                 }
             }
 
-            callback(false, null, null);
+            result(false, (DeviceStatus?) null, null);
         });
     }
 }

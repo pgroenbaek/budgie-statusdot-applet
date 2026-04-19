@@ -82,7 +82,16 @@ public class StatusDotManager : GLib.Object {
         api.get_device_status(device_name, (success, status, error_message) => {
             if (success) {
                 last_updated_at = status.updated_at;
-                set_current_status(status.status);
+                var remote_status = status.status;
+                
+                bool invisible = settings?.get_boolean("statusdot-invisible") ?? true;
+                if (!invisible) {
+                    set_current_status(remote_status);
+                }
+                else if (invisible && remote_status != StatusEnum.OFFLINE) {
+                    set_current_status(StatusEnum.OFFLINE);
+                }
+
                 hide_warning();
             }
             else {
