@@ -23,80 +23,109 @@ public class StatusDotManager : GLib.Object {
 
     private StatusDotAPI api;
 
-    public signal void disconnected();
-    public signal void connected();
-    public signal void updated();
-    public signal void warning(string message);
+    public signal void show_warning(string message, bool persistent = false);
+    public signal void hide_warning();
 
-    private string device_name = "test";
-    private uint refresh_interval_ms = 5 * 60 * 1000; // 5 minutes in milliseconds
-    private bool was_connected = true;
-    private int last_updated_at;
+    private uint tick_interval = 1 * 60 * 1000; // 1 minute in milliseconds
+    private uint max_refresh_interval = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+    private string device_name = "default";
+    private int last_updated_at = 0;
+    private bool last_outside_hours = false;
 
     private unowned GLib.Settings? settings;
 
-    public StatusDotManager(StatusDotAPI api, GLib.Settings? settings) {
-        this.api = api;
+    public StatusDotManager(GLib.Settings? settings, string base_url, string api_key) {
         this.settings = settings;
+        this.api = new StatusDotAPI(base_url, api_key);
 
-        refresh_from_api();
+        api.validate_connection(device_name, (valid, error_message) => {
+            if (valid) {
+                hide_warning();
+            }
+            else {
+                show_warning(error_message, true);
+            }
+        });
 
-        Timeout.add(refresh_interval_ms, () => {
+        Timeout.add(tick_interval, () => {
             refresh_from_api();
+            check_outside_hours();
+            check_idle_duration();
             return true;
         });
     }
 
-    public void set_api(StatusDotAPI api) {
-        this.api = api;
-        refresh_from_api();
-    }
-
     public void refresh_from_api() {
-        api.get_device_status.begin(device_name, (obj, res) => {
-            try {
-                var result = api.get_device_status.end(res);
+        int now = (int) (GLib.get_real_time() / 1000000);
+        int elapsed = now - last_updated_at;
 
-                //status = result.status;
-                last_updated_at = result.updated_at;
+        if (elapsed < max_refresh_interval) {
+            return;
+        }
 
-                updated();
-
-                if (!was_connected) {
-                    connected();
-                    was_connected = true;
+        if (!api.is_connection_valid()) {
+            api.validate_connection(device_name, (valid, error_message) => {
+                if (valid) {
+                    hide_warning();
                 }
-            } catch (Error e) {
-                //warning("Failed to refresh status: %s", e.message);
-
-                if (was_connected) {
-                    disconnected();
-                    was_connected = false;
+                else {
+                    show_warning(error_message, true);
                 }
+            });
+            return;
+        }
+
+        api.get_device_status(device_name, (success, status, error_message) => {
+            if (success) {
+                last_updated_at = status.updated_at;
+                set_current_status(status.status);
+            }
+            else {
+                show_warning(error_message, true);
             }
         });
+    }
+
+    public void check_outside_hours() {
+        // TODO
+    }
+
+    public void check_idle_duration() {
+        // TODO
     }
 
     public void set_current_status(StatusEnum new_status, int ttl_seconds = 420) {
+        if (!api.is_connection_valid()) {
+            return;
+        }
+
         var update = new StatusUpdate(new_status, ttl_seconds);
 
-        api.set_device_status.begin(device_name, update, (obj, res) => {
-            try {
-                api.set_device_status.end(res);
-
-                //status = new_status;
-                last_updated_at = (int) new DateTime.now_utc().to_unix();
-
-                updated();
-
-            } catch (Error e) {
-                //warning("Failed to set status: %s", e.message);
+        api.set_device_status(device_name, update, (success, status, error_message) => {
+            if (success) {
+                last_updated_at = status.updated_at;
+                settings?.set_int("statusdot-state", (int) status.status);
+            }
+            else {
+                show_warning(error_message, true);
             }
         });
     }
-    
-    public void set_base_url(string base_url) {
+
+    public void set_api_info(string base_url, string api_key) {
         settings?.set_string("statusdot-api-baseurl", base_url);
+
+        api = new StatusDotAPI(base_url, api_key);
+
+        api.validate_connection(device_name, (valid, error_message) => {
+            if (valid) {
+                hide_warning();
+            }
+            else {
+                show_warning(error_message, true);
+            }
+        });
     }
 
     public void set_device_name(string device_name) {
@@ -106,6 +135,11 @@ public class StatusDotManager : GLib.Object {
 
     public void set_invisibility_mode(bool invisible) {
         settings?.set_boolean("statusdot-invisible", invisible);
+
+        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
+        if (invisible && current_status != StatusEnum.OFFLINE) {
+            set_current_status(StatusEnum.OFFLINE);
+        }
     }
 
     public void set_workhours_start(int workhours_start) {
@@ -122,10 +156,20 @@ public class StatusDotManager : GLib.Object {
 
     public void set_show_away_as_offline(bool show_away_as_offline) {
         settings?.set_boolean("show-away-as-offline", show_away_as_offline);
+
+        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
+        if (current_status == StatusEnum.AWAY) {
+            set_current_status(StatusEnum.OFFLINE);
+        }
     }
 
     public void set_show_busy_as_offline(bool show_busy_as_offline) {
         settings?.set_boolean("show-busy-as-offline", show_busy_as_offline);
+
+        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
+        if (current_status == StatusEnum.BUSY) {
+            set_current_status(StatusEnum.OFFLINE);
+        }
     }
 
     public void set_away_after_idle(int away_after_idle) {
@@ -135,5 +179,4 @@ public class StatusDotManager : GLib.Object {
     public void set_offline_after_idle(int offline_after_idle) {
         settings?.set_int("offline-after-idle", offline_after_idle);
     }
-
 }

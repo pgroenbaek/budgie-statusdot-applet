@@ -16,7 +16,7 @@
       <description>The base URL of the Statusdot API (e.g. https://statusdot.example.com/api/).</description>
     </key>
     <key name="device-name" type="s">
-      <default>''</default>
+      <default>'default'</default>
       <summary>Device name</summary>
       <description>The device name used with the Statusdot API.</description>
     </key>

@@ -26,7 +26,11 @@ public class StatusDotAPI : GLib.Object {
     private Soup.Session session;
     private string base_url;
     private string api_key;
-    private bool is_connection_valid = false;
+    private bool connection_valid = false;
+
+    public delegate void RequestCallback(Soup.Session session, Soup.Message msg);
+    public delegate void StatusCallback(bool success, DeviceStatus? status, string? error_message);
+    public delegate void ValidationCallback(bool valid, string? error_message);
 
     public StatusDotAPI(string base_url, string api_key) {
         if (base_url.has_suffix("/")) {
@@ -40,163 +44,181 @@ public class StatusDotAPI : GLib.Object {
         this.api_key = api_key;
     }
 
-    public void validate_connection(string device_name) throws GLib.Error {
-        try {
-            GLib.Uri.parse(base_url, GLib.UriFlags.NONE);
-        } catch (GLib.Error e) {
-            is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
+    private void request(string method, string endpoint, string? body, owned RequestCallback callback) {
+        var request_message = new Soup.Message(method, base_url + endpoint);
+        request_message.request_headers.append("x-api-key", api_key);
+
+        if (body != null) {
+            request_message.request_headers.append("Content-Type", "application/json");
+            request_message.set_request(
+                "application/json",
+                Soup.MemoryUse.COPY,
+                (uint8[]) body.data
+            );
         }
 
-        if (base_url.length < 8 || base_url.substring(0, 8) != "https://") {
-            is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
-        }
+        session.queue_message(request_message, (session, response_message) => {
+            callback(session, response_message);
+        });
+    }
 
-        if (base_url.length < 4 || base_url.substring(base_url.length - 4, 4) != "/api") {
-            is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 1, "Invalid base URL (please adjust it in settings).");
-        }
-
-        var message = new Soup.Message("GET", base_url + "/status/" + device_name);
-        message.request_headers.append("x-api-key", this.api_key);
-        this.session.send_message(message);
-
-        if (message.status_code == Soup.Status.UNAUTHORIZED) {
-            is_connection_valid = false;
-            throw new GLib.Error(GLib.Quark.from_string("StatusDotAPIError"), 2, "Invalid API key (please adjust it in settings).");
-        }
-
-        if (message.status_code == Soup.Status.OK) {
-            is_connection_valid = true;
+    public void validate_connection(string device_name, owned ValidationCallback callback) {
+        if (base_url == "") {
+            connection_valid = false;
+            callback(false, "Base URL not set.");
             return;
         }
 
-        is_connection_valid = false;
-        throw new GLib.Error(
-            GLib.Quark.from_string("StatusDotAPIError"),
-            (int) message.status_code,
-            "API validation failed: %d %s".printf((int) message.status_code, message.reason_phrase)
-        );
-    }
-
-    private async string request(string method, string endpoint, string? body = null) throws GLib.Error {
-        if (!is_connection_valid) {
-            return "{}";
+        if (api_key == "") {
+            connection_valid = false;
+            callback(false, "API key not set.");
+            return;
         }
-
-        string url = this.base_url + endpoint;
-        var message = new Soup.Message(method, url);
-        message.request_headers.append("x-api-key", this.api_key);
-
-        if (body != null) {
-            message.request_headers.append("Content-Type", "application/json");
-            var body_bytes = (uint8[]) body.data;
-            message.set_request("application/json", Soup.MemoryUse.COPY, body_bytes);
-        }
-
-        string response = null;
-
-        var loop = new GLib.MainLoop();
-        this.session.queue_message(message, (session, message) => {
-            if (message.status_code != Soup.Status.OK &&
-                message.status_code != Soup.Status.CREATED)
-            {
-                loop.quit();
-                throw new GLib.Error(
-                    GLib.Quark.from_string("StatusDotAPIError"),
-                    (int) message.status_code,
-                    "HTTP request failed: %d %s".printf((int) message.status_code, message.reason_phrase)
-                );
-            }
-
-            response = (string) message.response_body.data;
-            loop.quit();
-        });
-
-        loop.run();
-        return response;
-    }
-
-    private async DeviceStatus parse_device_status_object(Json.Object obj) throws GLib.Error {
-        return new DeviceStatus(
-            (StatusEnum) obj.get_int_member("status"),
-            (int) obj.get_int_member("updated_at")
-        );
-    }
-
-    public async DeviceStatus? get_device_status(string device) throws GLib.Error {
-        if (!is_connection_valid) {
-            return null;
-        }
-
-        string endpoint = "/status/%s".printf(device);
-
-        string response = yield request("GET", endpoint);
-
-        if (response == null || response.length == 0) {
-            warning("Empty response from " + endpoint);
-            return null;
-        }
-
-        var parser = new Json.Parser();
 
         try {
-            parser.load_from_data(response, -1);
-            var root = parser.get_root();
+            GLib.Uri.parse(base_url, GLib.UriFlags.NONE);
+        } catch (GLib.Error e) {
+            connection_valid = false;
+            callback(false, "Invalid base URL: Not an URL.");
+            return;
+        }
 
-            if (root == null || root.get_node_type() != Json.NodeType.OBJECT) {
-                warning("Invalid JSON structure from " + endpoint);
-                return null;
+        if (!base_url.has_prefix("https://")) {
+            connection_valid = false;
+            callback(false, "Invalid base URL: Must start with 'https://'.");
+            return;
+        }
+
+        if (!base_url.has_suffix("/api")) {
+            connection_valid = false;
+            callback(false, "Invalid base URL: Must end with '/api'.");
+            return;
+        }
+
+        request("GET", "/status/" + device_name, null, (session, message) => {
+            if (message.status_code == Soup.Status.CANT_RESOLVE ||
+                message.status_code == Soup.Status.CANT_CONNECT ||
+                message.status_code == Soup.Status.SSL_FAILED ||
+                message.status_code == Soup.Status.IO_ERROR)
+            {
+                connection_valid = false;
+                callback(false, "Network error: Cannot reach server.");
+                return;
             }
 
-            var obj = root.get_object();
+            if (message.status_code == Soup.Status.UNAUTHORIZED) {
+                connection_valid = false;
+                callback(false, "Invalid API key.");
+                return;
+            }
 
-            return yield parse_device_status_object(obj);
+            if (message.status_code == Soup.Status.OK) {
+                connection_valid = true;
+                callback(true, null);
+                return;
+            }
 
-        } catch (GLib.Error e) {
-            warning("Failed to parse JSON from " + endpoint + ": %s".printf(e.message));
-            return null;
-        }
+            connection_valid = false;
+            callback(false, "API validation failed: %d %s".printf(
+                (int) message.status_code,
+                message.reason_phrase
+            ));
+        });
     }
 
-    public async bool set_device_status(string device, StatusUpdate update) throws GLib.Error {
-        if (!is_connection_valid) {
-            return false;
-        }
+    public bool is_connection_valid() {
+        return connection_valid;
+    }
 
-        string endpoint = "/status/%s".printf(device);
+    public void get_device_status(string device, owned StatusCallback callback) {
+        request("GET", "/status/" + device, null, (session, message) => {
+
+            if (message.status_code == Soup.Status.CANT_RESOLVE ||
+                message.status_code == Soup.Status.CANT_CONNECT ||
+                message.status_code == Soup.Status.SSL_FAILED ||
+                message.status_code == Soup.Status.IO_ERROR)
+            {
+                connection_valid = false;
+                callback(false, null, "Network error: Cannot reach server.");
+                return;
+            }
+
+            if (message.status_code == Soup.Status.OK) {
+                try {
+                    var parser = new Json.Parser();
+
+                    Soup.Buffer buffer = message.response_body.flatten();
+                    string json = (string) buffer.data;
+
+                    parser.load_from_data(json, -1);
+
+                    var obj = parser.get_root().get_object();
+
+                    var status = new DeviceStatus(
+                        (StatusEnum) obj.get_int_member("status"),
+                        (int) obj.get_int_member("updated_at")
+                    );
+
+                    callback(true, status, null);
+                    return;
+
+                } catch (Error e) {
+                    callback(false, null, e.message);
+                    return;
+                }
+            }
+
+            callback(false, null, null);
+        });
+    }
+
+    public void set_device_status(string device, StatusUpdate update, owned StatusCallback callback) {
 
         string json_body = "{ \"status\": %d, \"expiration_ttl\": %d }".printf(
             (int) update.status,
             update.expiration_ttl
         );
 
-        string response = yield request("POST", endpoint, json_body);
+        request("POST", "/status/" + device, json_body, (session, message) => {
 
-        if (response == null || response.length == 0) {
-            warning("Empty response from POST " + endpoint);
-            return false;
-        }
-
-        var parser = new Json.Parser();
-
-        try {
-            parser.load_from_data(response, -1);
-            var root = parser.get_root();
-
-            if (root == null || root.get_node_type() != Json.NodeType.OBJECT) {
-                warning("Invalid JSON structure from POST " + endpoint);
-                return false;
+            if (message.status_code == Soup.Status.CANT_RESOLVE ||
+                message.status_code == Soup.Status.CANT_CONNECT ||
+                message.status_code == Soup.Status.SSL_FAILED ||
+                message.status_code == Soup.Status.IO_ERROR)
+            {
+                connection_valid = false;
+                callback(false, null, "Network error: Cannot reach server.");
+                return;
             }
 
-            var obj = root.get_object();
+            if (message.status_code == Soup.Status.OK ||
+                message.status_code == Soup.Status.CREATED) {
 
-            return obj.has_member("success") && obj.get_boolean_member("success");
+                try {
+                    var parser = new Json.Parser();
 
-        } catch (GLib.Error e) {
-            warning("Failed to parse JSON from POST " + endpoint + ": %s".printf(e.message));
-            return false;
-        }
+                    Soup.Buffer buffer = message.response_body.flatten();
+                    string json = (string) buffer.data;
+
+                    parser.load_from_data(json, -1);
+
+                    var obj = parser.get_root().get_object();
+
+                    var status = new DeviceStatus(
+                        (StatusEnum) obj.get_int_member("status"),
+                        (int) obj.get_int_member("updated_at")
+                    );
+
+                    callback(true, status, null);
+                    return;
+
+                } catch (Error e) {
+                    callback(false, null, e.message);
+                    return;
+                }
+            }
+
+            callback(false, null, null);
+        });
     }
 }

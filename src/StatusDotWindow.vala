@@ -37,7 +37,6 @@ public class StatusDotWindow : Budgie.Popover {
     private GLib.HashTable<StatusEnum, Gtk.ToggleButton> status_toggles =
         new GLib.HashTable<StatusEnum, Gtk.ToggleButton>(GLib.direct_hash, GLib.direct_equal);
 
-    private StatusDotAPI api;
     private StatusDotManager status_manager;
 
     private Secret.Schema api_key_schema;
@@ -56,9 +55,6 @@ public class StatusDotWindow : Budgie.Popover {
             Secret.SchemaAttributeType.STRING
         );
 
-        string base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
-        string api_key = lookup_api_key() ?? "";
-
         var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         container.get_style_context().add_class("container");
 
@@ -69,19 +65,12 @@ public class StatusDotWindow : Budgie.Popover {
         container.pack_start(warning_box, false, false, 0);
 
         /*
-        API connection and status manager.
+        Status manager.
         */
-        api = new StatusDotAPI(base_url, api_key);
-        status_manager = new StatusDotManager(api, c_settings);
-/*
-        try {
-            api.validate_connection("laptop");
-            hide_warning();
-            settings.set_boolean("warning-persistent", false);
-        } catch (GLib.Error e) {
-            show_warning("%s".printf(e.message));
-            settings.set_boolean("warning-persistent", true);
-        }*/
+        string base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
+        string api_key = lookup_api_key() ?? "";
+
+        status_manager = new StatusDotManager(c_settings, base_url, api_key);
 
         /*
         Stack with main and settings ui.
@@ -102,38 +91,33 @@ public class StatusDotWindow : Budgie.Popover {
         add(container);
 
         /*
-        Initial state.
-        */
-        //set_invisibility(true);
-
-        /*
         Events wiring.
         */
-        settings.changed["statusdot-state"].connect(() => {
-            int value = settings.get_int("statusdot-state");
-            StatusEnum status = (StatusEnum) value;
-
-            //status_manager.set_current_status(status);
+        status_manager.show_warning.connect((message, persistent) => {
+            show_warning(message);
+            settings.set_boolean("warning-persistent", persistent);
         });
 
-        settings.changed["statusdot-invisible"].connect(() => {
-            bool invisible = settings.get_boolean("statusdot-invisible");
-
-            //set_invisibility(invisible);
-        });
-
-        status_manager.connected.connect(() => {
+        status_manager.hide_warning.connect(() => {
             hide_warning();
             settings.set_boolean("warning-persistent", false);
         });
-        status_manager.disconnected.connect(() => {
-            show_warning("No internet connection");
-            settings.set_boolean("warning-persistent", true);
+
+        settings.changed["statusdot-state"].connect(() => {
+            update_button_state();
         });
-        status_manager.updated.connect(() => {
-            update_controls();
+
+        settings.changed["show-away-as-offline"].connect(() => {
+            update_button_visibility();
         });
-        status_manager.refresh_from_api();
+
+        settings.changed["show-busy-as-offline"].connect(() => {
+            update_button_visibility();
+        });
+
+        settings.changed["statusdot-invisible"].connect(() => {
+            update_invisibility_mode();
+        });
         
         this.show.connect(() => {
             var warning_persistent = settings.get_boolean("warning-persistent");
@@ -142,21 +126,41 @@ public class StatusDotWindow : Budgie.Popover {
             if (!warning_persistent || warning_text == null || warning_text == "") {
                 hide_warning();
             }
+
+            var away_button = status_toggles.lookup(StatusEnum.AWAY);
+            var busy_button = status_toggles.lookup(StatusEnum.BUSY);
+
+            bool show_away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
+            bool show_busy_as_offline = settings?.get_boolean("show-busy-as-offline") ?? false;
+            away_button.set_visible(!show_away_as_offline);
+            busy_button.set_visible(!show_busy_as_offline);
         });
-        //this.show_all();
     }
 
-    private void update_controls() {
-        /*StatusEnum status = status_manager.status;
-        bool invisible = status_manager.invisible;
-        
-        status_toggles.foreach((key, value) => {
-            value.set_active(key == status);
-        });
+    private void update_button_visibility() {
+        var away_button = status_toggles.lookup(StatusEnum.AWAY);
+        var busy_button = status_toggles.lookup(StatusEnum.BUSY);
 
+        bool show_away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
+        bool show_busy_as_offline = settings?.get_boolean("show-busy-as-offline") ?? false;
+        away_button.set_sensitive(!show_away_as_offline);
+        away_button.set_visible(!show_away_as_offline);
+        busy_button.set_sensitive(!show_busy_as_offline);
+        busy_button.set_visible(!show_busy_as_offline);
+    }
+
+    private void update_button_state() {
+        StatusEnum status = (StatusEnum) settings.get_int("statusdot-state");
+        status_toggles.foreach((key, button) => {
+            button.set_active(key == status);
+        });
+    }
+
+    private void update_invisibility_mode() {
+        bool invisible = settings?.get_boolean("statusdot-invisible") ?? true;
         if (invisibility_switch.get_active() != invisible) {
             invisibility_switch.set_active(invisible);
-        }*/
+        }
     }
 
     private Gtk.Button create_icon_button(string icon_name, string? label_text, bool hover_reveal = false) {
@@ -238,7 +242,7 @@ public class StatusDotWindow : Budgie.Popover {
 
         string current_base_url = settings?.get_string("statusdot-api-baseurl") ?? "";
         string current_api_key = lookup_api_key() ?? "";
-        string current_devicename = settings?.get_string("device-name") ?? "";
+        string current_devicename = settings?.get_string("device-name") ?? "default";
         int current_work_start = settings?.get_int("working-hours-start") ?? 540;
         int current_work_end = settings?.get_int("working-hours-end") ?? 1020;
         bool current_invisible_outside = settings?.get_boolean("invisible-outside-hours") ?? true;
@@ -397,10 +401,8 @@ public class StatusDotWindow : Budgie.Popover {
             string new_api_key = entry_apikey.get_text() ?? "";
             string new_device_name = entry_devicename.get_text() ?? "";
 
-            settings?.set_string("statusdot-api-baseurl", new_base_url);
             store_api_key(new_api_key);
 
-            status_manager.set_base_url(new_base_url);
             status_manager.set_device_name(new_device_name);
             status_manager.set_workhours_start(time_work_start.get_value_as_int());
             status_manager.set_workhours_end(time_work_end.get_value_as_int());
@@ -410,19 +412,7 @@ public class StatusDotWindow : Budgie.Popover {
             status_manager.set_away_after_idle(spin_away_after_idle.get_value_as_int());
             status_manager.set_offline_after_idle(spin_offline_after_idle.get_value_as_int());
 
-            api = new StatusDotAPI(new_base_url, new_api_key);
-
-            try {
-                api.validate_connection("laptop");
-                hide_warning();
-                settings.set_boolean("warning-persistent", false);
-            } catch (GLib.Error e) {
-                show_warning("%s".printf(e.message));
-                settings.set_boolean("warning-persistent", true);
-            }
-
-            status_manager.set_api(api);
-            status_manager.refresh_from_api();
+            status_manager.set_api_info(new_base_url, new_api_key);
 
             switch_to_main();
         });
@@ -488,7 +478,7 @@ public class StatusDotWindow : Budgie.Popover {
                 }
 
                 button.set_active(true);
-                settings.set_int("statusdot-state", (int) status);
+                status_manager.set_current_status(status);
 
                 return true;
             });
