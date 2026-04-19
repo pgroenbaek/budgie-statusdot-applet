@@ -38,9 +38,9 @@ public class StatusUpdate : GLib.Object {
 
 public class DeviceStatus : GLib.Object {
     public StatusEnum status { get; set; }
-    public int updated_at { get; set; }
+    public int64 updated_at { get; set; }
 
-    public DeviceStatus(StatusEnum status, int updated_at) {
+    public DeviceStatus(StatusEnum status, int64 updated_at) {
         this.status = status;
         this.updated_at = updated_at;
     }

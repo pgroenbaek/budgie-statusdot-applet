@@ -28,7 +28,8 @@ public class StatusDotAPI : GLib.Object {
     private string api_key;
     private bool connection_valid = false;
 
-    public delegate void RequestCallback(Soup.Session session, Soup.Message msg);
+    private delegate void RequestCallback(Soup.Session session, Soup.Message msg);
+
     public delegate void StatusCallback(bool success, DeviceStatus? status, string? error_message);
     public delegate void ValidationCallback(bool valid, string? error_message);
 
@@ -60,6 +61,11 @@ public class StatusDotAPI : GLib.Object {
         session.queue_message(request_message, (session, response_message) => {
             callback(session, response_message);
         });
+    }
+
+    private string get_json(Soup.Message message) {
+        Soup.Buffer buffer = message.response_body.flatten();
+        return (string) buffer.data;
     }
 
     public void validate_connection(string device_name, owned ValidationCallback callback) {
@@ -147,8 +153,9 @@ public class StatusDotAPI : GLib.Object {
                 try {
                     var parser = new Json.Parser();
 
-                    Soup.Buffer buffer = message.response_body.flatten();
-                    string json = (string) buffer.data;
+                    string json = get_json(message);
+
+                    GLib.message(json);
 
                     parser.load_from_data(json, -1);
 
@@ -156,7 +163,7 @@ public class StatusDotAPI : GLib.Object {
 
                     var status = new DeviceStatus(
                         (StatusEnum) obj.get_int_member("status"),
-                        (int) obj.get_int_member("updated_at")
+                        obj.get_int_member("updated_at")
                     );
 
                     callback(true, status, null);
@@ -197,8 +204,7 @@ public class StatusDotAPI : GLib.Object {
                 try {
                     var parser = new Json.Parser();
 
-                    Soup.Buffer buffer = message.response_body.flatten();
-                    string json = (string) buffer.data;
+                    string json = get_json(message);
 
                     parser.load_from_data(json, -1);
 
@@ -206,7 +212,7 @@ public class StatusDotAPI : GLib.Object {
 
                     var status = new DeviceStatus(
                         (StatusEnum) obj.get_int_member("status"),
-                        (int) obj.get_int_member("updated_at")
+                        obj.get_int_member("updated_at")
                     );
 
                     callback(true, status, null);

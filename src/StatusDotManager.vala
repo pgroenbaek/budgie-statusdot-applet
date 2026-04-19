@@ -29,8 +29,7 @@ public class StatusDotManager : GLib.Object {
     private uint tick_interval = 1 * 60 * 1000; // 1 minute in milliseconds
     private uint max_refresh_interval = 5 * 60 * 1000; // 5 minutes in milliseconds
 
-    private string device_name = "default";
-    private int last_updated_at = 0;
+    private int64 last_updated_at = 0;
     private bool last_outside_hours = false;
 
     private unowned GLib.Settings? settings;
@@ -38,6 +37,8 @@ public class StatusDotManager : GLib.Object {
     public StatusDotManager(GLib.Settings? settings, string base_url, string api_key) {
         this.settings = settings;
         this.api = new StatusDotAPI(base_url, api_key);
+
+        var device_name = settings?.get_string("device-name") ?? "default";
 
         api.validate_connection(device_name, (valid, error_message) => {
             if (valid) {
@@ -57,12 +58,14 @@ public class StatusDotManager : GLib.Object {
     }
 
     public void refresh_from_api() {
-        int now = (int) (GLib.get_real_time() / 1000000);
-        int elapsed = now - last_updated_at;
+        int64 now = GLib.get_real_time () / 1000;
+        int64 elapsed = now - last_updated_at;
 
         if (elapsed < max_refresh_interval) {
             return;
         }
+
+        var device_name = settings?.get_string("device-name") ?? "default";
 
         if (!api.is_connection_valid()) {
             api.validate_connection(device_name, (valid, error_message) => {
@@ -80,6 +83,7 @@ public class StatusDotManager : GLib.Object {
             if (success) {
                 last_updated_at = status.updated_at;
                 set_current_status(status.status);
+                hide_warning();
             }
             else {
                 show_warning(error_message, true);
@@ -101,6 +105,7 @@ public class StatusDotManager : GLib.Object {
         }
 
         var update = new StatusUpdate(new_status, ttl_seconds);
+        var device_name = settings?.get_string("device-name") ?? "default";
 
         api.set_device_status(device_name, update, (success, status, error_message) => {
             if (success) {
@@ -118,6 +123,8 @@ public class StatusDotManager : GLib.Object {
 
         api = new StatusDotAPI(base_url, api_key);
 
+        var device_name = settings?.get_string("device-name") ?? "default";
+
         api.validate_connection(device_name, (valid, error_message) => {
             if (valid) {
                 hide_warning();
@@ -129,7 +136,6 @@ public class StatusDotManager : GLib.Object {
     }
 
     public void set_device_name(string device_name) {
-        this.device_name = device_name;
         settings?.set_string("device-name", device_name);
     }
 
