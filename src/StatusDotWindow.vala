@@ -55,7 +55,7 @@ public class StatusDotWindow : Budgie.Popover {
             Secret.SchemaAttributeType.STRING
         );
 
-        StatusDotIdleManager idle = new StatusDotIdleManager();
+        StatusDotIdleDetector idle = new StatusDotIdleDetector();
         Timeout.add_seconds (1, () => {
             uint64 sec = idle.get_idle_seconds ();
 

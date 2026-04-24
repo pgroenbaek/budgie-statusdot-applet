@@ -15,7 +15,7 @@ xscrnsaver_dep = cc.find_library('Xss', required: true)
 applet_statusdot_sources = [
   'StatusDotAPI.vala',
   'StatusDotData.vala',
-  'StatusDotIdleManager.vala',
+  'StatusDotIdleDetector.vala',
   'StatusDotManager.vala',
   'StatusDotApplet.vala',
   'StatusDotSettings.vala',
