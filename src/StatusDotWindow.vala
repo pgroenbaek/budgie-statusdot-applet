@@ -245,7 +245,7 @@ public class StatusDotWindow : Budgie.Popover {
         string current_devicename = settings?.get_string("device-name") ?? "default";
         int current_work_start = settings?.get_int("working-hours-start") ?? 540;
         int current_work_end = settings?.get_int("working-hours-end") ?? 1020;
-        bool current_invisible_outside = settings?.get_boolean("invisible-outside-hours") ?? true;
+        bool current_offline_outside = settings?.get_boolean("offline-outside-hours") ?? true;
         bool current_away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
         bool current_busy_as_offline = settings?.get_boolean("show-busy-as-offline") ?? false;
         int current_away_after_idle = settings?.get_int("away-after-idle") ?? 5;
@@ -337,15 +337,15 @@ public class StatusDotWindow : Budgie.Popover {
         grid.attach(label_work_end, 0, 4, 1, 1);
         grid.attach(time_work_end, 1, 4, 1, 1);
 
-        var label_invisible_outside = new Gtk.Label("Invisible outside hours:");
-        label_invisible_outside.set_halign(Gtk.Align.END);
+        var label_offline_outside = new Gtk.Label("Offline outside hours:");
+        label_offline_outside.set_halign(Gtk.Align.END);
 
-        var switch_invisible_outside = new Gtk.Switch();
-        switch_invisible_outside.set_halign(Gtk.Align.START);
-        switch_invisible_outside.set_active(current_invisible_outside);
+        var switch_offline_outside = new Gtk.Switch();
+        switch_offline_outside.set_halign(Gtk.Align.START);
+        switch_offline_outside.set_active(current_offline_outside);
 
-        grid.attach(label_invisible_outside, 0, 5, 1, 1);
-        grid.attach(switch_invisible_outside, 1, 5, 1, 1);
+        grid.attach(label_offline_outside, 0, 5, 1, 1);
+        grid.attach(switch_offline_outside, 1, 5, 1, 1);
 
         var label_away_as_offline = new Gtk.Label("Show away as offline:");
         label_away_as_offline.set_halign(Gtk.Align.END);
@@ -406,7 +406,7 @@ public class StatusDotWindow : Budgie.Popover {
             status_manager.set_device_name(new_device_name);
             status_manager.set_workhours_start(time_work_start.get_value_as_int());
             status_manager.set_workhours_end(time_work_end.get_value_as_int());
-            status_manager.set_invisible_outside_hours(switch_invisible_outside.get_active());
+            status_manager.set_offline_outside_hours(switch_offline_outside.get_active());
             status_manager.set_show_away_as_offline(switch_away_as_offline.get_active());
             status_manager.set_show_busy_as_offline(switch_busy_as_offline.get_active());
             status_manager.set_away_after_idle(spin_away_after_idle.get_value_as_int());

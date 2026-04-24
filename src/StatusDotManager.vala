@@ -81,7 +81,7 @@ public class StatusDotManager : GLib.Object {
         }
 
         bool outside_hours_block = !inside_work_hours;
-        bool enforce_offline_outside_hours = settings?.get_boolean("invisible-outside-hours") ?? false;
+        bool enforce_offline_outside_hours = settings?.get_boolean("offline-outside-hours") ?? false;
 
         if (outside_hours_block && enforce_offline_outside_hours) {
             chosen = StatusEnum.OFFLINE;
@@ -92,7 +92,7 @@ public class StatusDotManager : GLib.Object {
             chosen = StatusEnum.OFFLINE;
         }
 
-        force_apply(chosen);
+        apply_status(chosen);
     }
 
     private void apply_status(StatusEnum new_status, int ttl_seconds = 420) {
@@ -175,7 +175,7 @@ public class StatusDotManager : GLib.Object {
     }
 
     private void update_work_hours_state() {
-        bool enabled = settings?.get_boolean("invisible-outside-hours") ?? false;
+        bool enabled = settings?.get_boolean("offline-outside-hours") ?? false;
 
         if (!enabled) {
             inside_work_hours = true;
@@ -248,8 +248,8 @@ public class StatusDotManager : GLib.Object {
         resolve_state();
     }
 
-    public void set_invisible_outside_hours(bool v) {
-        settings?.set_boolean("invisible-outside-hours", v);
+    public void set_offline_outside_hours(bool v) {
+        settings?.set_boolean("offline-outside-hours", v);
         resolve_state();
     }
 

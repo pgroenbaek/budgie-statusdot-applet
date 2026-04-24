@@ -30,7 +30,7 @@
       <summary>REPLACEME</summary>
       <description>REPLACEME</description>
     </key>
-    <key name="invisible-outside-hours" type="b">
+    <key name="offline-outside-hours" type="b">
       <default>true</default>
       <summary>REPLACEME</summary>
       <description>REPLACEME</description>
