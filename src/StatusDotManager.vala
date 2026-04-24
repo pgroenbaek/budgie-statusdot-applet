@@ -17,6 +17,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// TODO:
+// - if status is set when invisible, dont change it to anything but OFFLINE
+// - Outside hours range
+// - Invisible outside hours
+// - Idle time settings and duration detection
+
 using GLib;
 
 public class StatusDotManager : GLib.Object {
@@ -86,6 +92,7 @@ public class StatusDotManager : GLib.Object {
                 
                 bool invisible = settings?.get_boolean("statusdot-invisible") ?? true;
                 if (!invisible) {
+                    
                     set_current_status(remote_status);
                 }
                 else if (invisible && remote_status != StatusEnum.OFFLINE) {
