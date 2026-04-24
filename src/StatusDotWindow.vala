@@ -55,18 +55,6 @@ public class StatusDotWindow : Budgie.Popover {
             Secret.SchemaAttributeType.STRING
         );
 
-        StatusDotIdleDetector idle = new StatusDotIdleDetector();
-        Timeout.add_seconds (1, () => {
-            uint64 sec = idle.get_idle_seconds ();
-
-            stdout.printf ("Idle: %llu sec (%s)\n",
-                sec,
-                idle.get_backend_name ()
-            );
-
-            return true;
-        });
-
         var container = new Gtk.Box(Gtk.Orientation.VERTICAL, 0);
         container.get_style_context().add_class("container");
 

@@ -17,32 +17,33 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// TODO:
-// - if status is set when invisible, dont change it to anything but OFFLINE
-// - Outside hours range
-// - Invisible outside hours
-// - Idle time settings and duration detection
-
 using GLib;
 
 public class StatusDotManager : GLib.Object {
 
     private StatusDotAPI api;
+    private StatusDotIdleDetector idle_detector;
 
     public signal void show_warning(string message, bool persistent = false);
     public signal void hide_warning();
 
-    private uint tick_interval = 1 * 60 * 1000; // 1 minute in milliseconds
-    private uint max_refresh_interval = 5 * 60 * 1000; // 5 minutes in milliseconds
+    private uint tick_interval = 1000;
+    private uint max_refresh_interval = 5 * 60 * 1000;
 
     private int64 last_updated_at = 0;
-    private bool last_outside_hours = false;
 
     private unowned GLib.Settings? settings;
+
+    private StatusEnum? api_status = null;
+    private StatusEnum? idle_status = null;
+    private bool inside_work_hours = true;
+
+    private int api_request_id = 0;
 
     public StatusDotManager(GLib.Settings? settings, string base_url, string api_key) {
         this.settings = settings;
         this.api = new StatusDotAPI(base_url, api_key);
+        this.idle_detector = new StatusDotIdleDetector();
 
         var device_name = settings?.get_string("device-name") ?? "default";
 
@@ -57,65 +58,44 @@ public class StatusDotManager : GLib.Object {
 
         Timeout.add(tick_interval, () => {
             refresh_from_api();
-            check_outside_hours();
-            check_idle_duration();
+            check_idle_state();
+            update_work_hours_state();
             return true;
         });
     }
 
-    public void refresh_from_api() {
-        int64 now = GLib.get_real_time () / 1000;
-        int64 elapsed = now - last_updated_at;
+    private void resolve_state() {
+        update_work_hours_state();
 
-        if (elapsed < max_refresh_interval) {
+        StatusEnum? chosen = null;
+
+        if (idle_status != null) {
+            chosen = idle_status;
+        }
+        else if (api_status != null) {
+            chosen = api_status;
+        }
+
+        if (chosen == null) {
             return;
         }
 
-        var device_name = settings?.get_string("device-name") ?? "default";
+        bool outside_hours_block = !inside_work_hours;
+        bool enforce_offline_outside_hours = settings?.get_boolean("invisible-outside-hours") ?? false;
 
-        if (!api.is_connection_valid()) {
-            api.validate_connection(device_name, (valid, error_message) => {
-                if (valid) {
-                    hide_warning();
-                }
-                else {
-                    show_warning(error_message, true);
-                }
-            });
-            return;
+        if (outside_hours_block && enforce_offline_outside_hours) {
+            chosen = StatusEnum.OFFLINE;
         }
 
-        api.get_device_status(device_name, (success, status, error_message) => {
-            if (success) {
-                last_updated_at = status.updated_at;
-                var remote_status = status.status;
-                
-                bool invisible = settings?.get_boolean("statusdot-invisible") ?? true;
-                if (!invisible) {
-                    
-                    set_current_status(remote_status);
-                }
-                else if (invisible && remote_status != StatusEnum.OFFLINE) {
-                    set_current_status(StatusEnum.OFFLINE);
-                }
+        bool invisible = settings?.get_boolean("statusdot-invisible") ?? true;
+        if (invisible && chosen != StatusEnum.OFFLINE) {
+            chosen = StatusEnum.OFFLINE;
+        }
 
-                hide_warning();
-            }
-            else {
-                show_warning(error_message, true);
-            }
-        });
+        force_apply(chosen);
     }
 
-    public void check_outside_hours() {
-        // TODO
-    }
-
-    public void check_idle_duration() {
-        // TODO
-    }
-
-    public void set_current_status(StatusEnum new_status, int ttl_seconds = 420) {
+    private void apply_status(StatusEnum new_status, int ttl_seconds = 420) {
         if (!api.is_connection_valid()) {
             return;
         }
@@ -127,11 +107,112 @@ public class StatusDotManager : GLib.Object {
             if (success) {
                 last_updated_at = status.updated_at;
                 settings?.set_int("statusdot-state", (int) status.status);
+                hide_warning();
             }
             else {
                 show_warning(error_message, true);
             }
         });
+    }
+
+    public void refresh_from_api() {
+        int64 now = GLib.get_real_time() / 1000;
+        if (now - last_updated_at < max_refresh_interval) {
+            return;
+        }
+
+        var device_name = settings?.get_string("device-name") ?? "default";
+
+        int request_id = ++api_request_id;
+
+        if (!api.is_connection_valid()) {
+            api.validate_connection(device_name, (valid, error_message) => {
+                if (!valid) {
+                    show_warning(error_message, true);
+                }
+                else {
+                    hide_warning();
+                }
+            });
+            return;
+        }
+
+        api.get_device_status(device_name, (success, status, error_message) => {
+            if (request_id != api_request_id) {
+                return;
+            }
+
+            if (!success) {
+                show_warning(error_message, true);
+                return;
+            }
+
+            api_status = status.status;
+            last_updated_at = status.updated_at;
+
+            resolve_state();
+        });
+    }
+
+    public void check_idle_state() {
+        uint64 idle_seconds = idle_detector.get_idle_seconds();
+
+        bool away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
+        int away_after_idle = settings?.get_int("away-after-idle") ?? 5;
+        int offline_after_idle = settings?.get_int("offline-after-idle") ?? 15;
+
+        if (idle_seconds >= offline_after_idle * 60) {
+            idle_status = StatusEnum.OFFLINE;
+        }
+        else if (idle_seconds >= away_after_idle * 60) {
+            idle_status = away_as_offline ? StatusEnum.OFFLINE : StatusEnum.AWAY;
+        }
+        else {
+            idle_status = null;
+        }
+
+        resolve_state();
+    }
+
+    private void update_work_hours_state() {
+        bool enabled = settings?.get_boolean("invisible-outside-hours") ?? false;
+
+        if (!enabled) {
+            inside_work_hours = true;
+            return;
+        }
+
+        int start = settings?.get_int("working-hours-start") ?? 540;
+        int end   = settings?.get_int("working-hours-end") ?? 1020;
+
+        var now = new DateTime.now_local();
+        int current = now.get_hour() * 60 + now.get_minute();
+
+        if (start < end) {
+            inside_work_hours = (current >= start && current < end);
+        }
+        else {
+            inside_work_hours = (current >= start || current < end);
+        }
+    }
+
+    public void set_invisibility_mode(bool invisible) {
+        settings?.set_boolean("statusdot-invisible", invisible);
+        resolve_state();
+    }
+
+    public void set_show_away_as_offline(bool v) {
+        settings?.set_boolean("show-away-as-offline", v);
+        resolve_state();
+    }
+
+    public void set_show_busy_as_offline(bool v) {
+        settings?.set_boolean("show-busy-as-offline", v);
+        resolve_state();
+    }
+
+    public void set_device_name(string name) {
+        settings?.set_string("device-name", name);
     }
 
     public void set_api_info(string base_url, string api_key) {
@@ -151,54 +232,34 @@ public class StatusDotManager : GLib.Object {
         });
     }
 
-    public void set_device_name(string device_name) {
-        settings?.set_string("device-name", device_name);
+    public void set_current_status(StatusEnum status, int ttl_seconds = 420) {
+        api_status = status;
+        resolve_state();
+        apply_status(status, ttl_seconds);
     }
 
-    public void set_invisibility_mode(bool invisible) {
-        settings?.set_boolean("statusdot-invisible", invisible);
-
-        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
-        if (invisible && current_status != StatusEnum.OFFLINE) {
-            set_current_status(StatusEnum.OFFLINE);
-        }
+    public void set_workhours_start(int v) {
+        settings?.set_int("working-hours-start", v);
+        resolve_state();
     }
 
-    public void set_workhours_start(int workhours_start) {
-        settings?.set_int("working-hours-start", workhours_start);
+    public void set_workhours_end(int v) {
+        settings?.set_int("working-hours-end", v);
+        resolve_state();
     }
 
-    public void set_workhours_end(int workhours_end) {
-        settings?.set_int("working-hours-end", workhours_end);
+    public void set_invisible_outside_hours(bool v) {
+        settings?.set_boolean("invisible-outside-hours", v);
+        resolve_state();
     }
 
-    public void set_invisible_outside_hours(bool invisible_outside_hours) {
-        settings?.set_boolean("invisible-outside-hours", invisible_outside_hours);
+    public void set_away_after_idle(int v) {
+        settings?.set_int("away-after-idle", v);
+        resolve_state();
     }
 
-    public void set_show_away_as_offline(bool show_away_as_offline) {
-        settings?.set_boolean("show-away-as-offline", show_away_as_offline);
-
-        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
-        if (current_status == StatusEnum.AWAY) {
-            set_current_status(StatusEnum.OFFLINE);
-        }
-    }
-
-    public void set_show_busy_as_offline(bool show_busy_as_offline) {
-        settings?.set_boolean("show-busy-as-offline", show_busy_as_offline);
-
-        StatusEnum current_status = (StatusEnum) settings.get_int("statusdot-state");
-        if (current_status == StatusEnum.BUSY) {
-            set_current_status(StatusEnum.OFFLINE);
-        }
-    }
-
-    public void set_away_after_idle(int away_after_idle) {
-        settings?.set_int("away-after-idle", away_after_idle);
-    }
-
-    public void set_offline_after_idle(int offline_after_idle) {
-        settings?.set_int("offline-after-idle", offline_after_idle);
+    public void set_offline_after_idle(int v) {
+        settings?.set_int("offline-after-idle", v);
+        resolve_state();
     }
 }
