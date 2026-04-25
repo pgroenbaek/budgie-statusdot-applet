@@ -17,8 +17,6 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-// TODO Only send status to API when it has changed or every 5-6 mins.
-
 using GLib;
 
 public class StatusDotManager : GLib.Object {
@@ -32,6 +30,9 @@ public class StatusDotManager : GLib.Object {
     private uint tick_interval = 1000;
     private uint max_refresh_interval = 5 * 60 * 1000;
 
+    private StatusEnum? last_resolved_status = null;
+    private StatusEnum? last_sent_status = null;
+    private int64 last_sent_at = 0;
     private int64 last_updated_at = 0;
 
     private unowned GLib.Settings? settings;
@@ -61,7 +62,14 @@ public class StatusDotManager : GLib.Object {
         Timeout.add(tick_interval, () => {
             refresh_from_api();
             check_idle_state();
+
+            bool before = inside_work_hours;
             update_work_hours_state();
+
+            if (before != inside_work_hours) {
+                resolve_state();
+            }
+
             return true;
         });
     }
@@ -94,11 +102,25 @@ public class StatusDotManager : GLib.Object {
             chosen = StatusEnum.OFFLINE;
         }
 
-        apply_status(chosen);
+        bool changed = (last_resolved_status != chosen);
+        last_resolved_status = chosen;
+
+        apply_status(chosen, 420, changed);
     }
 
-    private void apply_status(StatusEnum new_status, int ttl_seconds = 420) {
+    private void apply_status(StatusEnum new_status, int ttl_seconds = 420, bool force = false) {
         if (!api.is_connection_valid()) {
+            return;
+        }
+
+        int64 now = GLib.get_real_time() / 1000;
+        int64 elapsed = now - last_sent_at;
+
+        if (last_sent_status == StatusEnum.OFFLINE && new_status == StatusEnum.OFFLINE) {
+            return;
+        }
+
+        if (!force && elapsed < max_refresh_interval) {
             return;
         }
 
@@ -108,6 +130,9 @@ public class StatusDotManager : GLib.Object {
         api.set_device_status(device_name, update, (success, status, error_message) => {
             if (success) {
                 last_updated_at = status.updated_at;
+                last_sent_at = now;
+                last_sent_status = status.status;
+
                 settings?.set_int("statusdot-state", (int) status.status);
                 hide_warning();
             }
@@ -163,17 +188,19 @@ public class StatusDotManager : GLib.Object {
         int away_after_idle = settings?.get_int("away-after-idle") ?? 5;
         int offline_after_idle = settings?.get_int("offline-after-idle") ?? 15;
 
+        StatusEnum? new_idle = null;
+
         if (idle_seconds >= offline_after_idle * 60) {
-            idle_status = StatusEnum.OFFLINE;
+            new_idle = StatusEnum.OFFLINE;
         }
         else if (idle_seconds >= away_after_idle * 60) {
-            idle_status = away_as_offline ? StatusEnum.OFFLINE : StatusEnum.AWAY;
-        }
-        else {
-            idle_status = null;
+            new_idle = away_as_offline ? StatusEnum.OFFLINE : StatusEnum.AWAY;
         }
 
-        resolve_state();
+        if (new_idle != idle_status) {
+            idle_status = new_idle;
+            resolve_state();
+        }
     }
 
     private void update_work_hours_state() {
@@ -236,8 +263,12 @@ public class StatusDotManager : GLib.Object {
 
     public void set_current_status(StatusEnum status, int ttl_seconds = 420) {
         api_status = status;
+
         resolve_state();
-        apply_status(status, ttl_seconds);
+
+        if (last_resolved_status != null) {
+            apply_status(last_resolved_status, ttl_seconds, true);
+        }
     }
 
     public void set_workhours_start(int v) {
