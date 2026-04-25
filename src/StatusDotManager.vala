@@ -17,6 +17,8 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+// TODO Only send status to API when it has changed or every 5-6 mins.
+
 using GLib;
 
 public class StatusDotManager : GLib.Object {

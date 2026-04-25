@@ -184,7 +184,7 @@ public class StatusDotAPI : GLib.Object {
             update.expiration_ttl
         );
 
-        request("POST", "/status/" + device, json_body, (session, message) => {
+        request("PUT", "/status/" + device, json_body, (session, message) => {
 
             if (message.status_code == Soup.Status.CANT_RESOLVE ||
                 message.status_code == Soup.Status.CANT_CONNECT ||
