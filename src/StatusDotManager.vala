@@ -129,9 +129,12 @@ public class StatusDotManager : GLib.Object {
 
         api.set_device_status(device_name, update, (success, status, error_message) => {
             if (success) {
-                last_updated_at = status.updated_at;
                 last_sent_at = now;
                 last_sent_status = status.status;
+
+                if (status.updated_at > last_updated_at) {
+                    last_updated_at = status.updated_at;
+                }
 
                 settings?.set_int("statusdot-state", (int) status.status);
                 hide_warning();
@@ -147,6 +150,8 @@ public class StatusDotManager : GLib.Object {
         if (now - last_updated_at < max_refresh_interval) {
             return;
         }
+
+        last_updated_at = now;
 
         var device_name = settings?.get_string("device-name") ?? "default";
 
@@ -175,7 +180,10 @@ public class StatusDotManager : GLib.Object {
             }
 
             api_status = status.status;
-            last_updated_at = status.updated_at;
+
+            if (status.updated_at > last_updated_at) {
+                last_updated_at = status.updated_at;
+            }
 
             resolve_state();
         });

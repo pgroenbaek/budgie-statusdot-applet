@@ -138,7 +138,6 @@ public class StatusDotAPI : GLib.Object {
 
     public void get_device_status(string device, owned Result<DeviceStatus> result) {
         request("GET", "/status/" + device, null, (session, message) => {
-
             if (message.status_code == Soup.Status.CANT_RESOLVE ||
                 message.status_code == Soup.Status.CANT_CONNECT ||
                 message.status_code == Soup.Status.SSL_FAILED ||
@@ -185,7 +184,6 @@ public class StatusDotAPI : GLib.Object {
         );
 
         request("PUT", "/status/" + device, json_body, (session, message) => {
-
             if (message.status_code == Soup.Status.CANT_RESOLVE ||
                 message.status_code == Soup.Status.CANT_CONNECT ||
                 message.status_code == Soup.Status.SSL_FAILED ||
