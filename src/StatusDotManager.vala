@@ -192,6 +192,8 @@ public class StatusDotManager : GLib.Object {
     public void check_idle_state() {
         uint64 idle_seconds = idle_detector.get_idle_seconds();
 
+        GLib.message("idle = %llu seconds", idle_seconds);
+
         bool away_as_offline = settings?.get_boolean("show-away-as-offline") ?? false;
         int away_after_idle = settings?.get_int("away-after-idle") ?? 5;
         int offline_after_idle = settings?.get_int("offline-after-idle") ?? 15;
