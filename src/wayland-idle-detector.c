@@ -191,7 +191,6 @@ static bool setup_wayland_connection(struct WaylandIdleDetector *s)
         return false;
     }
 
-
     if (wl_registry_add_listener(s->registry, &registry_listener, s) < 0) {
         destroy_wayland_connection(s);
         return false;

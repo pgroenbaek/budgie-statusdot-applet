@@ -33,7 +33,6 @@ struct X11IdleDetector
     XScreenSaverInfo* info;
 };
 
-
 X11IdleDetector* x11_idle_new(void)
 {
     X11IdleDetector* detector = calloc(1, sizeof(X11IdleDetector));
@@ -62,7 +61,6 @@ X11IdleDetector* x11_idle_new(void)
     return detector;
 }
 
-
 void x11_idle_free(X11IdleDetector* detector)
 {
     if (detector == NULL) {
@@ -81,7 +79,6 @@ void x11_idle_free(X11IdleDetector* detector)
 
     free(detector);
 }
-
 
 uint64_t x11_idle_seconds(X11IdleDetector* detector)
 {
