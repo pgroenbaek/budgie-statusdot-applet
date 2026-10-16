@@ -9,6 +9,7 @@ A Budgie panel applet to manage the state of the [Statusdot API](https://github.
 Find and download the `.deb` package in the [latest release](https://github.com/pgroenbaek/budgie-statusdot-applet/releases).
 
 Install using the command:
+
 ```bash
 sudo dpkg -i budgie-statusdot-applet_<version>_amd64.deb
 ```
@@ -17,7 +18,24 @@ Replace `<version>` with the actual version number in the filename.
 
 ## Usage
 
-TODO
+1. Add the applet to your Budgie panel in the *Budgie Desktop Settings* application.
+
+2. Deploy the [Statusdot API](https://github.com/pgroenbaek/statusdot-api) and make sure to set the `API_TOKEN` variable in the Cloudflare dashboard settings.
+
+3. Click the tray icon.
+
+![Applet with Invalid Base URL](./images/BaseUrlNotSet.png)
+
+4. Go to settings and fill out base URL and API token.
+
+![Settings](./images/Settings.png)
+
+5. Now you can manage the status of the Statusdot API.
+
+![Applet](./images/Applet.png)
+
+![Setting Status to Offline](./images/AppletSetOffline.png)
+
 
 ## Building
 

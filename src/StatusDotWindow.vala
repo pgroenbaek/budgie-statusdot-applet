@@ -514,6 +514,10 @@ public class StatusDotWindow : Budgie.Popover {
         var box = new Gtk.Box(Gtk.Orientation.HORIZONTAL, 6);
         box.set_halign(Gtk.Align.FILL);
         box.set_valign(Gtk.Align.START);
+        box.set_margin_top(3);
+        box.set_margin_bottom(3);
+        box.set_margin_start(3);
+        box.set_margin_end(3);
 
         var icon = new Gtk.Image.from_icon_name("dialog-warning-symbolic", Gtk.IconSize.BUTTON);
         icon.get_style_context().add_class("warning");
