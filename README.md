@@ -6,6 +6,7 @@
 A Budgie panel applet to manage the state of the [Statusdot API](https://github.com/pgroenbaek/statusdot-api).
 
 ## Installing
+
 Find and download the `.deb` package in the [latest release](https://github.com/pgroenbaek/budgie-statusdot-applet/releases).
 
 Install using the command:
